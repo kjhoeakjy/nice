@@ -61,6 +61,7 @@ flowchart TB
 |---|---|---|
 | `#/home` | `pageHome` | 업무 현황 |
 | `#/workflow` | `pageWorkflow` | 심사 온톨로지 |
+| `#/guide` | `pageGuide` | 사용 방법 |
 | `#/model` | `pageModel` | 모델 설명 |
 | `#/company/<corp_code>` | `pageCompany` | 기업 정보 |
 | `#/case/<id>` | `pageCase` | 심사 화면 (신규·만기연장 공통) |

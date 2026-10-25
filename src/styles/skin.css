@@ -220,6 +220,13 @@ nav::-webkit-scrollbar { height: 0; }
 .onto-center b { display: block; font-size: 17px; margin: 4px 0; }
 .onto-center span { font-size: 11.5px; color: var(--yellow); }
 .t td.nw { white-space: nowrap; font-weight: 500; }
+.howto { list-style: none; margin: 0; padding: 0; counter-reset: st; }
+.howto li { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 10px 0 10px 40px; border-bottom: 1px solid var(--line); position: relative; counter-increment: st; }
+.howto li:last-child { border-bottom: 0; }
+.howto li::before { content: counter(st); position: absolute; left: 0; top: 11px; width: 24px; height: 24px; border-radius: 3px; background: #5A3A1E; color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.howto p { margin: 2px 0 0; color: var(--text-2); font-size: 12.5px; }
+.howto-go { flex: none; text-align: right; font-size: 12.5px; }
+@media (max-width: 600px) { .howto li { flex-direction: column; align-items: flex-start; gap: 6px; } .howto-go { text-align: left; } }
 .flow { display: flex; list-style: none; margin: 12px 0; padding: 0; gap: 22px; }
 .flow li { flex: 1; position: relative; border: 1px solid var(--line); border-radius: 4px; background: #FAF8F4; padding: 10px 12px; }
 .flow li:first-child { border-left: 3px solid var(--yellow); }

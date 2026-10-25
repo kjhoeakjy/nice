@@ -360,11 +360,11 @@
   const NAV_STAFF = [
     ["@", "심사 업무"], ["home", "업무 현황"], ["workflow", "심사 온톨로지"], ["company", "기업 정보"],
     ["@", "여신 관리"], ["loans", "실행 여신"], ["monitor", "사후 모니터링"],
-    ["@", "모델"], ["model", "모델 설명"],
+    ["@", "안내"], ["guide", "사용 방법"], ["model", "모델 설명"],
   ];
   const NAV_CUSTOMER = [["@", "고객 서비스"], ["portal", "요청 자료 제출"]];
   const PAGE_LABEL = { home: "업무 현황", cases: "업무 현황", case: "업무 현황", company: "기업 정보", loans: "실행 여신", loan: "실행 여신",
-    monitor: "사후 모니터링", workflow: "심사 온톨로지", model: "모델 설명", basis: "모델 설명", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
+    monitor: "사후 모니터링", workflow: "심사 온톨로지", guide: "사용 방법", model: "모델 설명", basis: "모델 설명", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
   const ICON = {
     home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     company: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/><path d="M10 21v-3h4v3"/>',
@@ -372,6 +372,7 @@
     loans: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/>',
     monitor: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
     workflow: '<circle cx="4" cy="12" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="20" cy="19" r="2"/><path d="M6 12h6l6-7M12 12l6 7"/>',
+    guide: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14"/><path d="M12 17v.01"/>',
     model: '<path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h4"/>',
     packages: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><path d="M17 13v8M13 17h8"/>',
     audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -401,7 +402,7 @@
 
     const main = document.getElementById("main");
     const pages = { home: pageHome, company: pageCompany, cases: pageHome, case: pageCase, loans: pageLoans, loan: pageLoan,
-      monitor: pageMonitor, workflow: pageWorkflow, model: pageModel, basis: pageModel, packages: pagePackages, audit: pageAudit, portal: pagePortal };
+      monitor: pageMonitor, workflow: pageWorkflow, guide: pageGuide, model: pageModel, basis: pageModel, packages: pagePackages, audit: pageAudit, portal: pagePortal };
     const crumb = r.page === "case" || r.page === "loan" || (r.page === "company" && r.id)
       ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.id || "")}</b>`
       : "";
@@ -939,6 +940,29 @@
       </section>`;
   }
 
+  // ------------------------------------------------------------ 사용 방법
+  function pageGuide() {
+    const roleBtn = (id) => { const x = SEED.users.find((u) => u.id === id); return `<button type="button" class="ghost small" data-role="${id}">${esc(x.name)}로 전환</button>`; };
+    const steps = [
+      ["심사 절차 구성", "심사역", "대출 상품·신청인·기업 정보·신청 금액 선택 후 '절차 구성'. 심사 업무 버튼으로 업무별 자료·담당·판단 기준·최종 승인 확인", `<a href="#/workflow">심사 온톨로지</a>`],
+      ["심사 건 생성", "심사역", "'이 조건으로 심사 건 생성' 또는 기존 신청 건 선택", `<a href="#/case/APP-2026-0412">기존 신청 건</a>`],
+      ["필요 자료 요청·확인", "심사역", "심사 화면 2단계에서 미제출 자료 '요청', 접수 자료 '확인 완료', 현장 확인 결과 기록", ""],
+      ["자료 제출", "고객", "고객 화면에서 요청 자료 파일 선택 후 제출 (파일명만 기록)", roleBtn("c1")],
+      ["추가 확인 항목 선택", "심사역", "심사 화면 5단계에서 순정보가치가 양수인 항목 '요청'", `<a href="#/case/APP-2026-0412/evi">추가 확인 선택</a>`],
+      ["심사 의견", "심사역", "심사 화면 6단계에서 의견 기록", roleBtn("u1")],
+      ["승인", "심사팀장", "필요 자료 확인 완료 후 승인·조건부 승인·거절", roleBtn("u2")],
+      ["만기연장·사후 모니터링", "심사역", "만기 도래 여신의 연장 심사 시작, 검토 대상 공시의 검토 업무 생성", `<a href="#/loans">실행 여신</a> · <a href="#/monitor">사후 모니터링</a>`],
+    ];
+    return `<h1>사용 방법</h1>
+      <section class="card"><h2>사용자</h2>
+        <table class="t"><tr><th>사용자</th><th>역할</th><th></th></tr>
+          ${SEED.users.map((x) => `<tr><td class="nw">${esc(x.name)}</td><td>${esc(x.role)}${x.canApprove ? ` (전결 한도 ${fmt(x.canApprove)})` : ""}</td><td>${x.id === S.role ? `<span class="muted">현재 사용자</span>` : roleBtn(x.id)}</td></tr>`).join("")}</table>
+        <p class="note">화면 상단의 사용자 선택으로도 전환</p></section>
+      <section class="card"><h2>시연 순서</h2>
+        <ol class="howto">${steps.map(([t, who, d, link]) => `<li><div><b>${t}</b> <span class="muted small">${who}</span><p>${d}</p></div><div class="howto-go">${link}</div></li>`).join("")}</ol></section>
+      <section class="card"><h2>초기화</h2><p>화면 상단 '초기화' 두 번 클릭 시 시연 데이터를 처음 상태로 복원</p></section>`;
+  }
+
   // ------------------------------------------------------------ 업무 기능 관리 (패키지)
   function pagePackages() {
     return `<h1>업무 기능 관리</h1>
@@ -1001,13 +1025,14 @@
   // ------------------------------------------------------------ 이벤트
   const INIT = {};
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("button, [data-tab], [data-scope], [data-disc], [data-otask]");
+    const t = e.target.closest("button, [data-tab], [data-scope], [data-disc], [data-otask], [data-role]");
     if (!t) return;
     const r = route();
     if (t.dataset.tab) { companyTab = t.dataset.tab; render(); return; }
     if (t.dataset.scope) { fsScope = t.dataset.scope; render(); return; }
     if (t.dataset.disc) { discFilter = t.dataset.disc; render(); return; }
     if (t.dataset.otask) { workflowSelection.taskId = t.dataset.otask; keep(); render(); return; }
+    if (t.dataset.role) { S.role = t.dataset.role; save(); location.hash = user().customerOf ? "#/portal" : "#/home"; render(); return; }
     const act = t.dataset.act;
     if (!act) return;
     keep();
