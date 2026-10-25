@@ -2,7 +2,7 @@
 :root {
   --yellow: #E3A400; --yellow-deep: #C98A00; --orange: #6B4423; --orange-deep: #4A2E14;
   --cream: #FBF3DF; --yellow-weak: #F6E3AE; --orange-weak: #EADDC9;
-  --bg: #F5EDDC; --card: #FFFDF8; --line: #E6D9BC; --line-strong: #D3C09A;
+  --bg: #F5EDDC; --card: #FFFFFF; --line: #E6D9BC; --line-strong: #D3C09A;
   --text: #2A1E12; --text-2: #4B3A27; --muted: #8C7A5E;
   --ok: #4F7A3A; --ok-weak: #E7EEDC; --bad: #B4381F; --bad-weak: #F7E2DC;
   --shadow: 0 1px 2px rgba(70, 45, 10, .06), 0 2px 8px rgba(70, 45, 10, .05);
@@ -13,12 +13,12 @@ a { color: #8F5E00; }
 .customer .brand span { background: var(--orange); color: #fff; }
 .avatar { background: linear-gradient(135deg, var(--yellow), var(--orange)); }
 .env { background: var(--yellow); color: var(--orange-deep); }
-.t th { background: #F2E6C8; color: #5C4420; border-bottom-color: var(--line-strong); }
+.t th { background: #F7F7F7; color: #5C4420; border-bottom-color: var(--line-strong); }
 .t tr:hover td { background: #FAF3E2; }
 .t-public { background: var(--yellow-weak); color: var(--amber-text); }
-.t-syn { background: #EDE4D0; color: #5C4420; }
+.t-syn { background: #F7F7F7; color: #5C4420; }
 .t-calc { background: var(--orange-weak); color: var(--orange-deep); }
-.lv-info { background: #EDE4D0; color: #5C4420; }
+.lv-info { background: #F7F7F7; color: #5C4420; }
 .lv-warn, .st-wait { background: #F3D27A; color: var(--amber-text); }
 .st-sub { background: var(--yellow-weak); color: var(--amber-text); }
 .tab.on { color: var(--orange-deep); border-bottom-color: var(--yellow); }
@@ -30,7 +30,7 @@ button.ghost { color: var(--orange-deep); }
 .c-obj { background: var(--yellow-weak); color: #5C4420; }
 .c-fn { background: var(--cream); color: var(--orange-deep); border-color: var(--yellow-weak); }
 .c-act { background: var(--orange-weak); color: var(--orange-deep); }
-.progress li { background: #EDE3CC; }
+.progress li { background: #F7F7F7; }
 .chart .bar { fill: var(--yellow-deep); }
 .chart .bar.hl { fill: var(--orange); }
 .chart .bar.neg { fill: #C9977A; }
