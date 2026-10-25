@@ -843,7 +843,7 @@ window.CREDITOS_SEED = {
     const lc = latestYear(company, "CFS", asOf);
     if (lc && lc < ly) {
       add("확인 필요", `연결재무제표가 ${lc}년까지만 있음`,
-        `${+lc + 1}년부터는 별도재무제표만 공시되었습니다. 종속회사 처분 등 연결 범위 변동 여부를 확인해야 합니다. 이 기업에 대한 대출 심사는 차주인 법인 자체의 별도재무제표를 기준으로 합니다.`);
+        `${+lc + 1}년부터는 별도재무제표만 공시되었습니다. 종속회사 처분 등 연결 범위 변동 여부를 확인해야 합니다. 이 기업에 대한 대출 심사는 대출 신청 법인 자체의 별도재무제표를 기준으로 합니다.`);
     } else if (lc) {
       const r = val(company, "OFS", ly, "revenue"), rc = val(company, "CFS", lc, "revenue");
       if (r && rc && rc / r > 1.3)
@@ -1631,7 +1631,7 @@ window.CREDITOS_SEED = {
         ${keys.map((k) => `<tr><td>${C.LABELS[k]}</td>${ys.map((y) => { const it = C.item(c, fsScope, y, k);
           return `<td title="${it ? esc(it.src.account_nm + " · 접수번호 " + it.src.rcept_no) : "자료 없음"}">${it ? fmt(it.v) : "-"}</td>`; }).join("")}</tr>`).join("")}
         <tr class="srcrow"><td>원문</td>${ys.map((y) => `<td>${dartLink(c.financials[fsScope][y].rcept_no, "보기")}</td>`).join("")}</tr></table>
-        <p class="note">${fsScope === "OFS" ? "별도: 차주 법인 자체의 재무제표입니다." : "연결: 종속회사를 포함한 수치입니다. 법인 자체 상환능력과 구분해서 봅니다."} 금액에 마우스를 올리면 원래 계정명과 접수번호가 보입니다.</p></section>`}`;
+        <p class="note">${fsScope === "OFS" ? "별도: 대출 신청 법인 자체의 재무제표입니다." : "연결: 종속회사를 포함한 수치입니다. 법인 자체 상환능력과 구분해서 봅니다."} 금액에 마우스를 올리면 원래 계정명과 접수번호가 보입니다.</p></section>`}`;
   }
 
   function coDebt(c) {
@@ -1916,7 +1916,7 @@ window.CREDITOS_SEED = {
   function pageMonitor() {
     const evs = monitorEvents();
     return `<h1>사후 모니터링</h1>
-      <p class="sub">실행된 대출의 차주에게 새 공시가 나오거나 사채 만기가 오면 해당 대출과 연결해 보여줍니다. 중요도가 '검토' 이상이면 담당자 검토 업무를 만들 수 있습니다.</p>
+      <p class="sub">대출 실행 기업에 새 공시가 나오거나 사채 만기가 오면 해당 대출과 연결해 보여줍니다. 중요도가 '검토' 이상이면 담당자 검토 업무를 만들 수 있습니다.</p>
       <section class="card">${eventTable(evs)}
       <p class="note">중요도는 공시 분류별 규칙입니다 (차입·사채·보증·최대주주·소송: 검토, 관리종목·거래정지: 긴급, 그 외: 참고). 공시 외의 은행 내부 정보(연체, 거래 변화)는 PoC 범위에 없습니다.</p></section>`;
   }

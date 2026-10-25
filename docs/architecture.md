@@ -1,90 +1,98 @@
-# 구성과 실행 흐름
+# 실행 구조
 
-## 한 파일 구조
+## 파일 구성
 
-배포되는 `index.html` 은 네 개의 `<script>` 블록과 하나의 `<style>` 블록으로 이루어집니다. 순서대로 실행되며, 앞 블록이 `window` 에 올린 값을 뒤 블록이 사용합니다.
+배포 파일 `index.html` 은 `<style>` 블록 1개와 `<script>` 블록 4개로 구성됩니다. 스크립트는 아래 순서로 실행되며 뒤 블록이 앞 블록의 전역 값을 사용합니다.
 
 | 순서 | 원본 | 전역 이름 | 역할 |
 |---|---|---|---|
-| 1 | `src/data/dart.json` | `window.CREDITOS_DATA` | DART 공시 데이터 (실제 값) |
-| 2 | `src/data/seed.js` | `window.CREDITOS_SEED` | 가상 데이터: 사용자, 정책, 신청 건, 대출, 패키지 |
-| 3 | `src/js/creditos.js` | `window.CreditOS` | 공통 업무 함수와 함수 레지스트리 |
-| 4 | `src/js/app.js` | (없음) | 화면 렌더링, 라우팅, Action, 상태 저장 |
+| 1 | `src/data/dart.json` | `window.CREDITOS_DATA` | DART 공시 정보 |
+| 2 | `src/data/seed.js` | `window.CREDITOS_SEED` | 가상 데이터 |
+| 3 | `src/js/creditos.js` | `window.CreditOS` | 공통 기능, 기능 등록부 |
+| 4 | `src/js/app.js` | 없음 | 화면, 경로 처리, 업무 처리, 상태 저장 |
 
-CSS 는 `fonts.css → base.css → theme.css → skin.css` 순서로 이어 붙입니다. 뒤 파일이 앞 파일의 값을 덮어씁니다.
+| CSS 순서 | 역할 |
+|---|---|
+| `fonts.css` | 글꼴 선언 |
+| `base.css` | 기본 레이아웃·구성 요소 |
+| `theme.css` | 색상 변수와 색상 규칙 재지정 |
+| `skin.css` | 업무 시스템 스타일(평면·고밀도), 900px·600px 이하 반응형 |
 
-- `base.css`: 기본 레이아웃과 컴포넌트(상단 바, 메뉴, 카드, 표, 버튼, 심사 화면, 그래프).
-- `theme.css`: 색상 변수(`:root`)와 색상 관련 규칙만 다시 지정합니다.
-- `skin.css`: 업무 시스템 스타일(평면, 조밀, 어두운 상단 바)과 900px·600px 이하 반응형 규칙.
+뒤 파일의 규칙이 앞 파일의 규칙에 우선합니다.
 
 ## 계층
 
-```
-app.js (화면)
-  ├─ ACTIONS ─ runAction()      상태 변경. 역할·사전조건 확인 후 처리 기록(audit) 남김
-  └─ CreditOS.call(fn, 유스케이스, ...)
-        └─ creditos.js           계산·검증 함수. 화면 상태를 바꾸지 않음
-              └─ CREDITOS_DATA   DART 데이터 (읽기 전용)
+```mermaid
+flowchart TB
+  UI[app.js 화면] -->|runAction| ACT[업무 처리<br/>권한·사전 조건 확인, 처리 기록]
+  UI -->|CreditOS.call| FN[creditos.js 공통 기능<br/>계산 전용, 상태 변경 없음]
+  ACT --> ST[(상태 S<br/>localStorage)]
+  FN --> DATA[(CREDITOS_DATA<br/>읽기 전용)]
 ```
 
-- **공통 함수는 순수 계산만** 합니다. 입력(기업 데이터, 기준일, 조건)을 받아 결과 객체를 돌려줍니다.
-- **모든 함수 호출은 `CreditOS.call(name, useCase, ...args)`** 로 하며, 어느 유스케이스(신규 심사, 만기연장, 모니터링)가 어떤 버전의 함수를 불렀는지 `callLog` 에 남습니다. 함수 안에서 다른 공통 함수를 부를 때는 `sub()` 를 써서 바깥 호출의 유스케이스로 기록합니다.
-- **모든 상태 변경은 `runAction(name, params)`** 을 거칩니다. 각 Action 은 `allowed(user)`(실행 가능한 역할), `pre(params)`(사전조건, 실패 시 이유 문자열), `run(params)`(실행)으로 정의되며 결과가 처리 기록에 남습니다.
+| 원칙 | 내용 |
+|---|---|
+| 공통 기능 | 입력값 기반 계산만 수행, 화면 상태 변경 없음 |
+| 기능 호출 | `CreditOS.call(name, 업무명, ...args)` 사용, 호출 업무·기능 버전을 `callLog` 에 기록 |
+| 기능 내부 호출 | `sub(name, ...args)` 사용, 상위 호출의 업무명으로 기록 |
+| 상태 변경 | `runAction(name, params)` 로만 수행, 처리 기록(`audit`) 저장 |
+
+업무 처리 정의는 `allowed(user)`(실행 가능 역할), `pre(params)`(사전 조건, 불충족 사유 반환), `run(params)`(실행)로 구성됩니다.
 
 ## 상태
 
-`app.js` 의 상태 `S` 는 `localStorage["creditos-demo-v1"]` 에 JSON 으로 저장됩니다. 저장값이 없거나 읽을 수 없으면 `initialState()` 로 `seed.js` 에서 새로 만듭니다.
+저장 위치: `localStorage["creditos-demo-v1"]`. 저장값이 없거나 손상된 경우 `seed.js` 기준으로 초기화합니다.
 
 | 키 | 내용 |
 |---|---|
-| `role` | 현재 사용자 id (`u1` 심사역, `u2` 심사팀장, `c1` 고객) |
-| `cases` | 심사 건 (신규 신청 + 만기연장 건). 자료 요청, 의견, 결정 포함 |
+| `role` | 현재 사용자 (`u1` 심사역, `u2` 심사팀장, `c1` 고객) |
+| `cases` | 심사 건 (신규·만기연장), 자료 요청·의견·결정 포함 |
 | `loans` | 실행 여신 |
-| `tasks`, `events` | 모니터링 과제와 사건 처리 상태 |
+| `tasks`, `events` | 모니터링 검토 업무, 사건 처리 상태 |
 | `audit` | 처리 기록 |
 | `scenario` | 심사 건별 상환여력 시나리오 입력값 |
 | `evi` | 정보가치 계산 가정값 (화면에서 수정 가능) |
 | `seq` | 일련번호 |
 
-## 라우팅
+## 경로
 
-해시 기반입니다. `#/<page>/<id>/<sub>` 형태이며 `hashchange` 때마다 `render()` 가 화면 전체를 다시 그립니다.
+해시 기반 경로(`#/<page>/<id>`). `hashchange` 발생 시 `render()` 로 화면 전체를 다시 그립니다.
 
-| 해시 | 화면 함수 |
-|---|---|
-| `#/home` | `pageHome` 업무 현황 |
-| `#/company/<corp_code>` | `pageCompany` 기업 정보 |
-| `#/case/<id>` | `pageCase` 심사 화면 (신규·만기연장 공통) |
-| `#/loans`, `#/loan/<id>` | `pageLoans`, `pageLoan` 실행 여신 |
-| `#/monitor` | `pageMonitor` 사후 모니터링 |
-| `#/packages` | `pagePackages` 업무 기능 관리 |
-| `#/audit` | `pageAudit` 처리 기록 |
-| `#/portal` | `pagePortal` 고객 자료 제출 (고객 역할 전용) |
+| 해시 | 화면 함수 | 화면 |
+|---|---|---|
+| `#/home` | `pageHome` | 업무 현황 |
+| `#/company/<corp_code>` | `pageCompany` | 기업 정보 |
+| `#/case/<id>` | `pageCase` | 심사 화면 (신규·만기연장 공통) |
+| `#/loans`, `#/loan/<id>` | `pageLoans`, `pageLoan` | 실행 여신 |
+| `#/monitor` | `pageMonitor` | 사후 모니터링 |
+| `#/packages` | `pagePackages` | 업무 기능 관리 |
+| `#/audit` | `pageAudit` | 처리 기록 |
+| `#/portal` | `pagePortal` | 고객 화면 (고객 전용) |
 
-클릭·제출·변경 이벤트는 `document` 에 위임해서 처리합니다. 버튼의 `data-act` 가 Action 이름이고, 폼의 `data-form` 이 처리 종류(`scenario`, `evi`, `opinion`, `decision`, `assign`, `close`, `submit`)입니다.
+이벤트는 `document` 단위 위임 방식으로 처리합니다. 버튼 `data-act` 는 업무 처리 이름, 폼 `data-form` 은 처리 종류(`scenario`, `evi`, `opinion`, `decision`, `assign`, `close`, `submit`)입니다.
 
-## Action
+## 업무 처리
 
-| Action | 내용 |
-|---|---|
-| `RequestDocument` | 고객에게 자료 요청 |
-| `SubmitDocument` | 고객이 요청 자료 제출 (파일 이름만 기록) |
-| `ReviewDocument` | 제출 자료 확인 완료 또는 보완 요청 |
-| `AssignReviewer` | 담당 심사역 지정 (심사팀장만) |
-| `RecordOpinion` | 심사 의견 기록 |
-| `RecordDecision` | 승인·조건부 승인·거절 결정. 승인 권한 한도, 심사 의견, 필수 자료 확인 여부를 먼저 확인 |
-| `StartRenewalReview` | 만기연장 심사 건 생성 |
-| `CreateMonitoringTask` | 모니터링 사건을 점검 과제로 등록 |
-| `CloseEvent` | 모니터링 사건 종결 |
+| 이름 | 내용 | 실행 역할 |
+|---|---|---|
+| `RequestDocument` | 고객 자료 요청 | 심사역, 심사팀장 |
+| `SubmitDocument` | 요청 자료 제출 (파일명만 기록) | 고객 |
+| `ReviewDocument` | 제출 자료 확인 완료 또는 보완 요청 | 심사역, 심사팀장 |
+| `AssignReviewer` | 담당 심사역 배정 | 심사팀장 |
+| `RecordOpinion` | 심사 의견 기록 | 심사역, 심사팀장 |
+| `RecordDecision` | 승인·조건부 승인·거절. 전결 한도, 의견 기록, 필수 자료 확인 여부 사전 점검 | 전결 권한 보유자 |
+| `StartRenewalReview` | 만기연장 심사 건 생성 (만기 60일 전부터) | 심사역, 심사팀장 |
+| `CreateMonitoringTask` | 모니터링 사건의 검토 업무 등록 | 심사역, 심사팀장 |
+| `CloseEvent` | 모니터링 사건 종결 (종결 사유 필수) | 심사역, 심사팀장 |
 
-## 유스케이스 패키지
+## 업무 패키지
 
-`seed.js` 의 `packages` 는 유스케이스를 기능 묶음으로 정의합니다. 각 패키지는 `requires`(먼저 있어야 하는 객체·함수·Action)와 `adds`(새로 추가하는 것)를 가지며, `업무 기능 관리` 화면에 표시됩니다.
+`seed.js` 의 `packages` 에 업무별 구성(`requires` 선행 요소, `adds` 추가 요소)을 정의합니다.
 
-| 패키지 | 상태 | 추가하는 함수 |
+| 패키지 | 상태 | 추가 기능 |
 |---|---|---|
 | 신규 운전자금 심사 (`new-credit`) | 사용 중 | summarizeDebt, calcRatios, validateFacts, checkAuthority, riskSignals, simulateRepayment, policyCheck, nextBestAction |
 | 만기연장 심사 (`renewal`) | 사용 중 | checkCovenants |
 | 공시 기반 사후 모니터링 (`monitoring`) | 시범 | detectMonitoringEvents |
 
-만기연장과 모니터링은 신규 심사가 만든 함수를 다시 씁니다. 이 재사용이 PoC 에서 보여 주려는 핵심입니다.
+만기연장·사후 모니터링은 신규 심사의 공통 기능을 재사용합니다.
