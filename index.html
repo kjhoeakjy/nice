@@ -631,6 +631,30 @@ nav::-webkit-scrollbar { height: 0; }
 body { word-break: keep-all; overflow-wrap: break-word; }
 .step .chart { max-width: 620px; display: block; }
 
+/* 정리된 디자인 */
+:root { --line: #E7E1D5; --line-strong: #D8CFBE; }
+h1 { font-size: 20px; margin: 0 0 14px; }
+h2 { border-bottom: 0; padding-bottom: 0; margin: 0 0 12px; font-size: 14.5px; }
+h3 { color: var(--text-2); }
+.card { border-radius: 6px; padding: 18px 20px; margin-bottom: 14px; }
+.t th { background: transparent; border-top: 0; color: var(--muted); font-weight: 500; font-size: 11.5px; }
+.t tr:hover td { background: transparent; }
+.t tr:last-child td { border-bottom: 0; }
+.t tr.hlrow td { background: #FBF3DC; }
+.stepper { border-radius: 6px; }
+.step h2 { gap: 10px; }
+.step h2 .n { border-radius: 50%; }
+.kpi { padding: 14px 18px; }
+.grid4 { border-radius: 6px; }
+button, .btn-ghost, input, select, textarea { border-radius: 4px; }
+.onto-node, .flow li, .workflow-product, .guide a { border-radius: 6px; }
+.onto-center { border-radius: 6px; }
+nav { background: #FBFAF7; }
+.sub { color: var(--muted); }
+.crumb { margin-bottom: 6px; }
+@media (min-width: 901px) { main { padding: 24px 32px 64px; max-width: 1180px; } }
+@media (max-width: 600px) { .card { padding: 14px; } h1 { font-size: 18px; } }
+
 </style>
 
   <header class="top">
@@ -663,8 +687,8 @@ window.CREDITOS_SEED = {
   bank: "가상은행",
   users: [
     { id: "u1", name: "김연주", role: "심사역", team: "기업여신심사부", canApprove: 0 },
-    { id: "u2", name: "이준호", role: "심사팀장", team: "기업여신심사부", canApprove: 3e9 },
-    { id: "c1", name: "최민수", role: "다산솔루에타 재무팀장", team: "다산솔루에타", customerOf: "00624518" },
+    { id: "u2", name: "김팀장", role: "심사팀장", team: "기업여신심사부", canApprove: 3e9 },
+    { id: "c1", name: "김고객", role: "다산솔루에타 재무팀장", team: "다산솔루에타", customerOf: "00624518" },
   ],
 
   renewalPolicy: {
@@ -795,7 +819,7 @@ window.CREDITOS_SEED = {
       method: "bullet",
       purpose: "원자재 구매 대금 및 2026년 하반기 운영자금",
       submittedAt: "2026-10-08",
-      submitter: { name: "최민수", role: "재무팀장" },
+      submitter: { name: "김고객", role: "재무팀장" },
       status: "심사 중",
       assignee: "u1",
       documents: [
@@ -1477,7 +1501,7 @@ window.CREDITOS_SEED = {
           productId: prod.id, corp_code: co.corp_code, product: prod.name,
           amount: v.amountEok * 1e8, rate: 6.8, years: 2, method: "bullet",
           purpose: "상품·신청인 조건별 심사 절차 비교 (가상)",
-          submittedAt: ASOF, submitter: v.isProxy ? { name: "최민수", role: "재무팀장" } : { name: co.ceo, role: "대표이사" },
+          submittedAt: ASOF, submitter: v.isProxy ? { name: "김고객", role: "재무팀장" } : { name: co.ceo, role: "대표이사" },
           status: "심사 중", assignee: "u1", documents: [], requests: [], opinions: [], decision: null,
           demoCase: true,
         };
@@ -1639,7 +1663,7 @@ window.CREDITOS_SEED = {
         const l = loanById(p.loanId);
         const c = { id: "RN-" + l.id.slice(3), kind: "renewal", loanId: l.id, corp_code: l.corp_code,
           product: l.product + " 만기연장", amount: l.balance, rate: l.renewal.requestedRate, years: l.renewal.requestedYears,
-          method: "bullet", purpose: "기존 운전자금대출 만기연장", submittedAt: ASOF, submitter: { name: "최민수", role: "재무팀장" },
+          method: "bullet", purpose: "기존 운전자금대출 만기연장", submittedAt: ASOF, submitter: { name: "김고객", role: "재무팀장" },
           status: "심사 중", assignee: "u1", documents: [], requests: [], opinions: [], decision: null };
         S.cases.push(c);
         l.renewal.status = "연장 심사 중";
@@ -1812,7 +1836,7 @@ window.CREDITOS_SEED = {
       if (k === "monitor") { const n = monitorEvents().filter((e) => (S.events[e.key] || {}).status === undefined && e.severity !== "참고").length; if (n) badge = `<span class="nb">${n}</span>`; }
       if (k === "portal") { const n = myRequests().filter((x) => ["요청됨", "보완 요청"].includes(x.r.status)).length; if (n) badge = `<span class="nb">${n}</span>`; }
       return `<a href="#/${k}" class="${r.page === k || (k === "cases" && r.page === "case") || (k === "loans" && r.page === "loan") ? "on" : ""}">${icon(k)}<span>${label}</span>${badge}</a>`;
-    }).join("") + `<div class="nav-foot">${esc(SEED.bank)} 기업여신심사부<br>시연용 화면 · 공시 자료는 DART 기준</div>`;
+    }).join("");
 
     const main = document.getElementById("main");
     const pages = { home: pageHome, company: pageCompany, cases: pageHome, case: pageCase, loans: pageLoans, loan: pageLoan,
@@ -1842,11 +1866,6 @@ window.CREDITOS_SEED = {
     const open = S.tasks.filter((t) => t.status !== "완료");
     return `
       <h1>업무 현황</h1>
-      <div class="guide">
-        <a href="#/workflow"><b>심사 온톨로지</b><span>심사 업무별 자료·담당·판단 기준·승인의 연결</span></a>
-        <a href="#/case/APP-2026-0412"><b>온톨로지 기반 심사</b><span>신청부터 승인까지</span></a>
-        <a href="#/case/APP-2026-0412/evi"><b>정보가치 기반 추가 확인</b><span>기대손실 감소와 확인 비용의 비교</span></a>
-      </div>
       <section class="card"><h2>심사 건</h2>${caseTable(S.cases)}</section>
       ${waiting.length ? `<section class="card"><h2>고객 제출 자료</h2><table class="t"><tr><th>신청 건</th><th>자료</th><th>제출</th></tr>
         ${waiting.map(({ c, r }) => `<tr><td><a href="#/case/${c.id}">${c.id}</a></td><td>${esc(r.name)}</td><td>${esc(r.submittedAt)}</td></tr>`).join("")}</table></section>` : ""}
@@ -2066,10 +2085,10 @@ window.CREDITOS_SEED = {
             <button type="submit">의견 기록</button></form>` : ""}</div>
         <div><h3>결정 · ${esc(pc.approver)}</h3>
           ${c.decision ? `<p>${statusBadge(c.decision.decision)} ${esc(userName(c.decision.by))}</p>`
-            : `${!pc.complete ? `<p class="warn-t">미충족: ${pc.missing.map((m) => esc(m.name)).join(", ")}</p>` : ""}
+            : `${!pc.complete ? `<p class="warn-t">필요 자료 미충족 ${pc.missing.length}건</p>` : ""}
                ${canDecide ? `<form data-form="decision"><input name="comment" placeholder="결정 사유">
                  <div class="btns"><button type="submit" name="decision" value="승인">승인</button><button type="submit" name="decision" value="조건부 승인">조건부 승인</button><button type="submit" class="danger" name="decision" value="거절">거절</button></div></form>`
-               : `<p class="muted">전결권자 계정(이준호)에서 결정</p>`}`}
+               : `<p class="muted">전결권자 계정(김팀장)에서 결정</p>`}`}
         </div></div>`);
 
     // 진행 단계
@@ -2083,25 +2102,13 @@ window.CREDITOS_SEED = {
     ];
     const curIdx = stages.findIndex((x) => !x[1]);
     const stepper = `<ol class="stepper keep">${stages.map((x, i) => `<li class="${x[1] ? "done" : i === curIdx ? "cur" : ""}"><span class="dot">${x[1] ? "✓" : i + 1}</span><div><b>${x[0]}</b><small>${esc(x[2])}</small></div></li>`).join("")}</ol>`;
-    const base = sim.results[0];
-    const top = nba.ranked.find((a) => a.recommend);
-    const side = `<aside class="case-side">
-        <div class="card side-card">
-          <div class="side-metrics">
-            <div><small>위험 신호</small><b class="band band-${risk.band}">${risk.band}</b><span>${risk.score}점</span></div>
-            <div><small>최소 DSCR</small><b class="${base.minDscr < 1 ? "warn-t" : ""}">${isFinite(base.minDscr) ? base.minDscr.toFixed(2) : "-"}</b><span>기본</span></div>
-            <div><small>확인 필요</small><b>${checks.filter((f) => f.level === "확인 필요").length}</b><span>검증</span></div>
-          </div>
-          ${top ? `<div class="side-reco"><small>요청 권고</small><b>${esc(top.name)}</b></div>` : ""}
-        </div>
-      </aside>`;
     return `
       <div class="page-head keep"><div><h1>${c.id} <span class="h1-co"><a href="#/company/${co.corp_code}">${esc(co.name)}</a></span></h1>
         <p class="sub">${c.kind === "new" ? "신규 심사" : "만기연장 심사"} · ${statusBadge(c.status)} · 비대면 접수 ${c.submittedAt}</p></div></div>
       ${stepper}
-      <div class="case-layout"><div class="case-main">
+      <div class="case-layout no-side"><div class="case-main">
         ${s1}${s2}${s3}${s4}${s5}${s6}
-      </div>${side}</div>`;
+      </div></div>`;
   }
 
   // ------------------------------------------------------------ 여신 관리
@@ -2117,7 +2124,6 @@ window.CREDITOS_SEED = {
     const co = company(l.corp_code);
     const rc = S.cases.find((c) => c.loanId === l.id);
     const cov = C.call("checkCovenants", "만기연장 심사", co, ASOF, l.covenants);
-    const evs = monitorEvents().filter((e) => e.loans.includes(l.id));
     const dleft = Math.round(C.monthsBetween(ASOF, l.maturity) * 30);
     const late = l.repayments.filter((p) => p[3] !== "정상").length;
     return `
@@ -2132,8 +2138,7 @@ window.CREDITOS_SEED = {
         <section class="card"><h2>만기연장</h2>
           ${rc ? `<p><a href="#/case/${rc.id}">${rc.id}</a> ${statusBadge(rc.status)}</p>` : `<button data-act="StartRenewalReview" data-loan="${l.id}">만기연장 심사 시작</button>`}</section>
         <section class="card"><h2>약정 점검</h2><ul class="checks">${cov.map((k) => `<li>${levelBadge(k.ok === true ? "통과" : k.ok === false ? "확인 필요" : "정보")}<div><b>${esc(k.ok === null ? k.name : k.text)}</b></div></li>`).join("")}</ul></section>
-      </div>
-      <section class="card"><h2>대출 실행 이후 공시 사건</h2>${eventTable(evs, false)}</section>`;
+      </div>`;
   }
 
   // ------------------------------------------------------------ 사후 모니터링
@@ -2216,14 +2221,9 @@ window.CREDITOS_SEED = {
         <div class="seg wrap">${wf.tasks.map((t) => `<button type="button" data-otask="${t.id}" class="${t.id === task.id ? "on" : ""}">${esc(t.name)}</button>`).join("")}</div>
         ${ontologyHub(task, wf)}
       </section>
-      <div class="grid4">
-        <div class="kpi"><div class="k">심사 업무</div><div class="v">${wf.tasks.length}개</div></div>
-        <div class="kpi"><div class="k">필요 자료</div><div class="v">${wf.checks.length}개</div></div>
-        <div class="kpi"><div class="k">현장 확인</div><div class="v">${wf.onsite.length}개</div></div>
-        <div class="kpi"><div class="k">전결권자</div><div class="v small">${esc(wf.approver)}</div></div>
-      </div>
       <section class="card"><h2>상품별 심사 절차</h2>
         <div class="grid3">${compare.map(({ p, wf: w }) => `<div class="workflow-product ${p.id === sel.productId ? "selected" : ""}"><h3>${esc(p.name)}</h3>
+          <p class="small muted">업무 ${w.tasks.length} · 자료 ${w.checks.length} · 현장 확인 ${w.onsite.length} · ${esc(w.approver)}</p>
           <ul class="plain small">${w.tasks.map((t) => `<li><b>${esc(t.name)}</b>${t.docs.length ? `<div class="muted">${t.docs.map((d) => esc(d.name)).join(", ")}</div>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
         ${sel.companyType === "listed" ? `<div class="btns"><button data-act="CreateCaseFromWorkflow" data-productid="${sel.productId}" data-applicant="${sel.applicant}" data-amount="${sel.amountEok}">이 조건으로 심사 건 생성</button></div>`
           : `<p class="note">비상장기업은 재무 데이터가 없어 절차 구성만 시연</p>`}
@@ -2254,16 +2254,8 @@ window.CREDITOS_SEED = {
     const flow = (items) => `<ol class="flow">${items.map(([t, d]) => `<li><b>${t}</b>${d ? `<span>${d}</span>` : ""}</li>`).join("")}</ol>`;
     const bands = C.meta.BANDS.map((b) => `${b.band} ${pct(b.p, 0)}`).join(" · ");
 
-    // 예시: 기존 신청 건의 실제 계산 결과
-    const app = caseById("APP-2026-0412") || { ...SEED.applications[0], kind: "new" };
-    const co = company(app.corp_code);
-    const risk = C.call("riskSignals", "모델 설명", co, ASOF);
-    const ev = eviContext({ ...app, kind: "new" }, null);
-    const nba = C.call("nextBestAction", "모델 설명", risk.prior, ev.actions, ev.loss);
-    const best = nba.compare.reduce((a, b) => (a.cost + a.loss <= b.cost + b.loss ? a : b));
 
     return `<h1>모델 설명</h1>
-      <p class="sub">기업 여신 비대면 심사 모델의 구조와 작동 방식</p>
 
       <section class="card"><h2>모델 구조</h2>
         <p>기업과 상품마다 다른 심사 절차를 하나의 구조로 구성하고, 절차 안의 판단을 데이터로 지원하는 모델입니다.</p>
@@ -2340,9 +2332,6 @@ window.CREDITOS_SEED = {
             ["순정보가치", "정보가치 − 확인 비용"],
             ["요청 순서", "순정보가치가 양수인 항목 중 큰 항목부터, 결과에 따라 재평가"],
           ])}</div></div>
-        <h3>적용 예시: ${esc(co.name)} ${fmt(app.amount)} 신청</h3>
-        ${tbl(["요청 방식", "평균 요청 건수", "확인 비용 + 기대손실"], nba.compare.map((x) => [x === best ? `<b>${esc(x.name)}</b>` : esc(x.name), x.count.toFixed(2), x === best ? `<b>${fmt(x.cost + x.loss, 2)}</b>` : fmt(x.cost + x.loss, 2)]))}
-        <p class="note">${A} 시연 조건의 계산 결과</p>
       </section>
 
       <section class="card"><h2>가정과 한계</h2>
@@ -2358,7 +2347,7 @@ window.CREDITOS_SEED = {
 
   // ------------------------------------------------------------ 사용 방법
   function pageGuide() {
-    const roleBtn = (id) => { const x = SEED.users.find((u) => u.id === id); return `<button type="button" class="ghost small" data-role="${id}">${esc(x.name)}로 전환</button>`; };
+    const roleBtn = (id) => { const x = SEED.users.find((u) => u.id === id); return `<button type="button" class="ghost small" data-role="${id}">${esc(x.name)}${(x.name.charCodeAt(x.name.length - 1) - 0xac00) % 28 && (x.name.charCodeAt(x.name.length - 1) - 0xac00) % 28 !== 8 ? "으로" : "로"} 전환</button>`; };
     const steps = [
       ["심사 절차 구성", "심사역", "대출 상품·신청인·기업 정보·신청 금액 선택 후 '절차 구성'. 심사 업무 버튼으로 업무별 자료·담당·판단 기준·최종 승인 확인", `<a href="#/workflow">심사 온톨로지</a>`],
       ["심사 건 생성", "심사역", "'이 조건으로 심사 건 생성' 또는 기존 신청 건 선택", `<a href="#/case/APP-2026-0412">기존 신청 건</a>`],
@@ -2370,14 +2359,8 @@ window.CREDITOS_SEED = {
       ["만기연장·사후 모니터링", "심사역", "만기 도래 여신의 연장 심사 시작, 검토 대상 공시의 검토 업무 생성", `<a href="#/loans">실행 여신</a> · <a href="#/monitor">사후 모니터링</a>`],
     ];
     return `<h1>사용 방법</h1>
-      <section class="card"><div class="row-between"><div><h2>자동 시연</h2><p class="small">심사 절차 구성부터 승인까지 자동 진행 (약 1분)</p></div><button type="button" data-demo-start>자동 시연 시작</button></div></section>
-      <section class="card"><h2>사용자</h2>
-        <table class="t"><tr><th>사용자</th><th>역할</th><th></th></tr>
-          ${SEED.users.map((x) => `<tr><td class="nw">${esc(x.name)}</td><td>${esc(x.role)}${x.canApprove ? ` (전결 한도 ${fmt(x.canApprove)})` : ""}</td><td>${x.id === S.role ? `<span class="muted">현재 사용자</span>` : roleBtn(x.id)}</td></tr>`).join("")}</table>
-        <p class="note">화면 상단의 사용자 선택으로도 전환</p></section>
       <section class="card"><h2>시연 순서</h2>
-        <ol class="howto">${steps.map(([t, who, d, link]) => `<li><div><b>${t}</b> <span class="muted small">${who}</span><p>${d}</p></div><div class="howto-go">${link}</div></li>`).join("")}</ol></section>
-      <section class="card"><h2>초기화</h2><p>화면 상단 '초기화' 두 번 클릭 시 시연 데이터를 처음 상태로 복원</p></section>`;
+        <ol class="howto">${steps.map(([t, who, d, link]) => `<li><div><b>${t}</b> <span class="muted small">${who}</span><p>${d}</p></div><div class="howto-go">${link}</div></li>`).join("")}</ol></section>`;
   }
 
   // ------------------------------------------------------------ 업무 기능 관리 (패키지)
@@ -2428,7 +2411,6 @@ window.CREDITOS_SEED = {
     const steps = ["접수", "자료 확인", "심사", "결정"];
     const stepOf = (c) => (c.decision ? 3 : c.opinions.length ? 2 : 1);
     return `<div class="row-between"><h1>${esc(co.name)} 대출 진행 현황</h1><button type="button" class="ghost small" data-role="u1">심사역 화면으로 전환</button></div>
-      <p class="sub">${esc(u.name)}님, 은행이 요청한 자료를 여기서 제출할 수 있습니다.</p>
       ${mine.map((c) => `<section class="card"><h2>${c.kind === "new" ? "신규 대출 신청" : "만기연장"} ${c.id}</h2>
         <p>${esc(c.product)} · ${fmt(c.amount)} · ${c.years}년</p>
         <ol class="progress">${steps.map((s, i) => `<li class="${i <= stepOf(c) ? "done" : ""}">${s}</li>`).join("")}</ol>
@@ -2617,7 +2599,7 @@ window.CREDITOS_SEED = {
         const f = demoMark('#step-2 form[data-form="onsite"]');
         if (f) { await demoWait(700); f.querySelector("[name=note]").value = "담보 건물 현황과 감정평가 내용 일치"; keep(); f.requestSubmit(); await demoWait(300); }
       }],
-      ["고객(최민수) 화면에서 요청 자료 제출", async () => {
+      ["고객(김고객) 화면에서 요청 자료 제출", async () => {
         await demoRole("c1", "#/portal");
         demoMark("main section.card:last-of-type");
         const c = caseById(caseId);
@@ -2641,7 +2623,7 @@ window.CREDITOS_SEED = {
         keep(); f.requestSubmit();
         await demoWait(300);
       }],
-      ["전결권자(심사팀장 이준호) 승인", async () => {
+      ["전결권자(심사팀장 김팀장) 승인", async () => {
         await demoRole("u2", "#/case/" + caseId);
         const f = demoMark('form[data-form="decision"]');
         await demoWait(900);

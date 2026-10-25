@@ -5,8 +5,8 @@ window.CREDITOS_SEED = {
   bank: "가상은행",
   users: [
     { id: "u1", name: "김연주", role: "심사역", team: "기업여신심사부", canApprove: 0 },
-    { id: "u2", name: "이준호", role: "심사팀장", team: "기업여신심사부", canApprove: 3e9 },
-    { id: "c1", name: "최민수", role: "다산솔루에타 재무팀장", team: "다산솔루에타", customerOf: "00624518" },
+    { id: "u2", name: "김팀장", role: "심사팀장", team: "기업여신심사부", canApprove: 3e9 },
+    { id: "c1", name: "김고객", role: "다산솔루에타 재무팀장", team: "다산솔루에타", customerOf: "00624518" },
   ],
 
   renewalPolicy: {
@@ -137,7 +137,7 @@ window.CREDITOS_SEED = {
       method: "bullet",
       purpose: "원자재 구매 대금 및 2026년 하반기 운영자금",
       submittedAt: "2026-10-08",
-      submitter: { name: "최민수", role: "재무팀장" },
+      submitter: { name: "김고객", role: "재무팀장" },
       status: "심사 중",
       assignee: "u1",
       documents: [
