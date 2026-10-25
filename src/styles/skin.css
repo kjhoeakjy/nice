@@ -219,7 +219,16 @@ nav::-webkit-scrollbar { height: 0; }
 .onto-center small { display: block; font-size: 11px; color: rgba(255,255,255,.7); }
 .onto-center b { display: block; font-size: 17px; margin: 4px 0; }
 .onto-center span { font-size: 11.5px; color: var(--yellow); }
+.t td.nw { white-space: nowrap; font-weight: 500; }
+.flow { display: flex; list-style: none; margin: 12px 0; padding: 0; gap: 22px; }
+.flow li { flex: 1; position: relative; border: 1px solid var(--line); border-radius: 4px; background: #FAF8F4; padding: 10px 12px; }
+.flow li:first-child { border-left: 3px solid var(--yellow); }
+.flow li + li::before { content: ""; position: absolute; left: -17px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-top: 2px solid var(--line-strong); border-right: 2px solid var(--line-strong); transform: rotate(45deg) scale(.7); }
+.flow b { display: block; font-size: 13px; }
+.flow span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 @media (max-width: 900px) {
+  .flow { flex-direction: column; gap: 14px; }
+  .flow li + li::before { left: 50%; top: -14px; margin: 0 0 0 -6px; transform: rotate(135deg) scale(.7); }
   .guide { grid-template-columns: 1fr; }
   .onto-hub { grid-template-columns: 1fr; gap: 8px; }
   .onto-center { grid-column: auto; grid-row: auto; order: -1; padding: 12px; }

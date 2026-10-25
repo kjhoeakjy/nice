@@ -360,11 +360,11 @@
   const NAV_STAFF = [
     ["@", "심사 업무"], ["home", "업무 현황"], ["workflow", "심사 온톨로지"], ["company", "기업 정보"],
     ["@", "여신 관리"], ["loans", "실행 여신"], ["monitor", "사후 모니터링"],
-    ["@", "기준"], ["basis", "산정 기준"],
+    ["@", "모델"], ["model", "모델 설명"],
   ];
   const NAV_CUSTOMER = [["@", "고객 서비스"], ["portal", "요청 자료 제출"]];
   const PAGE_LABEL = { home: "업무 현황", cases: "업무 현황", case: "업무 현황", company: "기업 정보", loans: "실행 여신", loan: "실행 여신",
-    monitor: "사후 모니터링", workflow: "심사 온톨로지", basis: "산정 기준", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
+    monitor: "사후 모니터링", workflow: "심사 온톨로지", model: "모델 설명", basis: "모델 설명", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
   const ICON = {
     home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     company: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/><path d="M10 21v-3h4v3"/>',
@@ -372,7 +372,7 @@
     loans: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/>',
     monitor: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
     workflow: '<circle cx="4" cy="12" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="20" cy="19" r="2"/><path d="M6 12h6l6-7M12 12l6 7"/>',
-    basis: '<path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h4"/>',
+    model: '<path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h4"/>',
     packages: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><path d="M17 13v8M13 17h8"/>',
     audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     portal: '<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/>',
@@ -401,7 +401,7 @@
 
     const main = document.getElementById("main");
     const pages = { home: pageHome, company: pageCompany, cases: pageHome, case: pageCase, loans: pageLoans, loan: pageLoan,
-      monitor: pageMonitor, workflow: pageWorkflow, basis: pageBasis, packages: pagePackages, audit: pageAudit, portal: pagePortal };
+      monitor: pageMonitor, workflow: pageWorkflow, model: pageModel, basis: pageModel, packages: pagePackages, audit: pageAudit, portal: pagePortal };
     const crumb = r.page === "case" || r.page === "loan" || (r.page === "company" && r.id)
       ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.id || "")}</b>`
       : "";
@@ -633,7 +633,7 @@
       <h3>요청 방식 비교</h3>
       <table class="t num"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
         ${nba.compare.map((x, i) => `<tr class="${i === 2 ? "hlrow" : ""}"><td class="l">${esc(x.name)}</td><td>${x.count.toFixed(2)}</td><td>${fmt(x.cost, 2)}</td><td>${fmt(x.loss, 2)}</td><td><b>${fmt(x.cost + x.loss, 2)}</b></td></tr>`).join("")}</table>
-      <p class="note"><a href="#/basis">산정 기준</a></p>`);
+      <p class="note"><a href="#/model">모델 설명</a></p>`);
 
     // 6. 추가 자료 요청·승인
     const canDecide = u.canApprove > 0;
@@ -814,7 +814,7 @@
       <p class="note">${tag("SYN")} 상품별 심사 업무와 전결 한도는 가상은행 내규</p>`;
   }
 
-  // ------------------------------------------------------------ 산정 기준
+  // ------------------------------------------------------------ 모델 설명
   // 정보가치 계산의 손실·비용. 부도 시 손실 = 대출금 × LGD(상품별), 기회손실 = 기대 이자이익,
   // 확인 비용 = 고객 이탈률 × 기대 이자이익 + 처리비용.
   function eviContext(c, wf) {
@@ -828,99 +828,115 @@
     return { lgd: pol.lgd, margin, actions, loss: { approveBad: c.amount * pol.lgd, rejectGood: margin } };
   }
 
-  function pageBasis() {
+  function pageModel() {
     const ont = SEED.processOntology;
     const ea = SEED.eviAssumptions;
-    const meta = C.meta;
     const sd = SEED.scenarioDefaults;
     const A = tag("ASSUME");
-    const B = `<span class="tag t-public">공식 기준</span>`;
-    const tbl = (head, rows) => `<table class="t"><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${rows.map((r) => `<tr>${r.map((x) => `<td>${x}</td>`).join("")}</tr>`).join("")}</table>`;
-    const lgdTxt = (v) => (v * 100).toFixed(Math.round(v * 1e4) % 100 ? 2 : 0) + "%";
-    const man = (v) => {
-      const e = Math.floor(v / 1e8), m = Math.round((v - e * 1e8) / 1e4);
-      return (e ? e.toLocaleString("ko-KR") + "억" + (m ? " " : "") : "") + (m || !e ? m.toLocaleString("ko-KR") + "만" : "") + " 원";
-    };
-    const bands = meta.BANDS.map((b, i) => {
-      const lo = i ? meta.BANDS[i - 1].max + 1 : 0;
-      return `${b.band} ${i === meta.BANDS.length - 1 ? `${lo}점 이상` : lo === b.max ? `${lo}점` : `${lo}~${b.max}점`} ${pct(b.p, 0)}`;
-    }).join(" · ");
-    const sev = (lv) => Object.keys(meta.EVENT_SEVERITY).filter((k) => meta.EVENT_SEVERITY[k] === lv).join(", ");
+    const tbl = (head, rows) => `<table class="t"><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${rows.map((r) => `<tr>${r.map((x, i) => `<td${i ? "" : ' class="nw"'}>${x}</td>`).join("")}</tr>`).join("")}</table>`;
+    const flow = (items) => `<ol class="flow">${items.map(([t, d]) => `<li><b>${t}</b>${d ? `<span>${d}</span>` : ""}</li>`).join("")}</ol>`;
+    const bands = C.meta.BANDS.map((b) => `${b.band} ${pct(b.p, 0)}`).join(" · ");
 
-    return `<h1>산정 기준</h1>
-      <p class="sub">${A} 은행 내부 데이터로 추정이 필요한 시연용 값 · ${B} 법령·회계기준·감독기준</p>
+    // 예시: 기존 신청 건의 실제 계산 결과
+    const app = caseById("APP-2026-0412") || { ...SEED.applications[0], kind: "new" };
+    const co = company(app.corp_code);
+    const risk = C.call("riskSignals", "모델 설명", co, ASOF);
+    const ev = eviContext({ ...app, kind: "new" }, null);
+    const nba = C.call("nextBestAction", "모델 설명", risk.prior, ev.actions, ev.loss);
+    const best = nba.compare.reduce((a, b) => (a.cost + a.loss <= b.cost + b.loss ? a : b));
 
-      <section class="card"><h2>데이터</h2>
-        ${tbl(["항목", "내용"], [
-          ["공시 정보", `DART 기업개황·재무제표·공시 목록·전환사채 발행결정·감사의견·임원 현황 (${Object.values(DATA.companies).map((x) => esc(x.name)).join(", ")}, 2015~2025 사업연도)`],
-          ["가상 데이터", "은행, 사용자, 대출 신청, 실행 여신, 내규"],
-          ["정보 시점", `기준일(${SEED.asOf}) 이전 공시만 사용`],
-          ["기준 재무제표", "별도재무제표 (대출 신청 법인 자체의 상환능력)"],
-        ])}</section>
+    return `<h1>모델 설명</h1>
+      <p class="sub">기업 여신 비대면 심사 모델의 구조와 작동 방식</p>
 
-      <section class="card"><h2>재무지표</h2>
-        ${tbl(["지표", "산식"], [
-          ["부채비율", "부채총계 ÷ 자본총계"],
-          ["유동비율", "유동자산 ÷ 유동부채"],
-          ["차입금의존도", "총차입금 ÷ 자산총계"],
-          ["순차입금", "총차입금 − 현금및현금성자산"],
-          ["이자보상배율", "영업이익 ÷ 금융원가"],
-          ["총차입금", meta.DEBT_PARTS.map((d) => d[1]).join(" + ")],
-        ])}</section>
+      <section class="card"><h2>모델 구조</h2>
+        <p>기업과 상품마다 다른 심사 절차를 하나의 구조로 구성하고, 절차 안의 판단을 데이터로 지원하는 모델입니다.</p>
+        ${flow([
+          ["대출 신청", "상품·신청인·금액"],
+          ["심사 온톨로지", "심사 절차 구성"],
+          ["자료 확보·검증", "DART 수집·고객 제출"],
+          ["재무·상환능력 분석", "재무지표·DSCR"],
+          ["추가 확인 선택", "정보가치 계산"],
+          ["승인", "전결권자"],
+        ])}
+        <p class="note">${tag("PUBLIC")} 기업 정보는 DART 공시(코스닥 2개사) · ${tag("SYN")} 은행 내부 정보는 가상 데이터</p>
+      </section>
+
+      <section class="card"><h2>심사 온톨로지</h2>
+        <p>심사 업무를 기본 단위로 필요 자료·제출 방식·담당·판단 기준·전결권자를 연결하고, 상품은 심사 업무의 조합으로 정의합니다.</p>
+        <div class="grid2"><div>
+          <h3>구성 요소</h3>
+          ${tbl(["요소", "내용"], [
+            ["심사 업무", Object.values(ont.tasks).map((t) => esc(t.name)).join(", ")],
+            ["자료", "명칭, 제출 방식(온라인 제출·DART 자동 수집·현장 확인), 출처"],
+            ["상품", "상품별 심사 업무 조합, 부도시손실률, 선택 확인 항목"],
+            ["전결 한도", "신청 금액별 최종 승인자"],
+          ])}</div><div>
+          <h3>조건에 따른 절차 구성</h3>
+          ${tbl(["조건", "절차 변화"], [
+            ["대출 상품", "보증부: 보증 확인 추가. 부동산담보: 담보 확인·현장 확인 추가"],
+            ["신청인", "대리 신청 시 위임장 요청 추가"],
+            ["기업 정보", "상장기업은 DART 자동 수집, 공시 부족 기업은 고객 제출"],
+            ["신청 금액", "전결권자 변경"],
+          ])}</div></div>
+        <p class="note">구성된 절차는 심사 화면의 필요 자료와 승인 조건으로 그대로 사용됩니다. <a href="#/workflow">심사 온톨로지 보기</a></p>
+      </section>
 
       <section class="card"><h2>자료 검증</h2>
-        ${tbl(["항목", "확인 필요 기준", "근거"], [
-          ["정보 시점", "결산 후 6개월 경과", `반기 실적 발생 (반기보고서 제출 기한 45일, 자본시장법 제160조) ${B}`],
-          ["사채 만기", "향후 12개월 이내 만기", `유동부채 분류 기준 (K-IFRS 제1001호) ${B}`],
-          ["감사의견", "적정 외 의견", `한정·부적정·의견거절 ${B}`],
-          ["대표권", "신청인과 공시상 대표이사 불일치", `대표이사의 대표권 (상법 제389조) ${B}`],
-          ["연결 범위", "연결재무제표 공시 중단", "종속기업 변동 확인"],
-          ["수치 재작성", "최초 공시와 0.5%·1천만 원 초과 차이", `중요성 기준 ${A}`],
-          ["출처 대조·등식", "100만 원 초과 차이", `표시 단위 차이 허용 ${A}`],
-        ])}</section>
-
-      <section class="card"><h2>위험 신호</h2>
-        ${tbl(["규칙", "점수"], meta.RISK_RULES.map((r) => [esc(r.text), r.pts]))}
-        <p class="note">구간별 부도확률 ${A}: ${bands}</p>
-        <p class="note">이자보상배율 1 미만: 한국은행 한계기업 기준(3년 연속 1 미만) 참조</p></section>
-
-      <section class="card"><h2>상환능력</h2>
-        ${tbl(["항목", "기준"], [
-          ["DSCR", "상환재원 ÷ 원리금 (기존 차입금 포함)"],
-          ["상환재원", "영업활동현금흐름 + 시나리오 영업이익 변동분"],
-          ["기존 차입 금리", `연 ${sd.existingRate}% ${A}`],
-          ["1년 내 만기분 차환율", `${sd.refinanceRatio}% ${A}`],
-          ["스트레스", `매출 ${sd.salesShock}%, 영업이익률 ${sd.marginShock}%p, 금리 +${sd.rateShock}%p ${A}`],
-        ])}</section>
-
-      <section class="card"><h2>정보가치</h2>
-        ${tbl(["경우", "손실"], [
-          ["부도 기업 승인", "대출금 × LGD"],
-          ["정상 기업 거절", `기대 이자이익 = 대출금 × (대출 금리 − 자금조달금리 ${ea.fundingRate}% ${A}) × 기간`],
-          ["추가 확인", `확인 비용 = 고객 이탈률 × 기대 이자이익 + 처리비용`],
+        <p>공시 자료를 그대로 사용하지 않고 심사 기준일 시점의 정보인지, 범위와 값이 일관된지 먼저 확인합니다.</p>
+        ${tbl(["검증", "확인 내용"], [
+          ["정보 시점", "기준일 이전 공시만 사용, 결산 후 6개월 경과 여부"],
+          ["범위", "연결·별도 재무제표 구분, 연결 범위 변동"],
+          ["일관성", "출처 간 값 대조, 전년도 수치 재작성"],
+          ["채무·감사", "1년 내 사채 만기, 감사의견"],
+          ["차입 권한", "신청인과 공시상 대표이사 비교"],
         ])}
-        <h3>상품별 LGD</h3>
-        ${tbl(["상품", "LGD", "근거"], ont.products.map((p) => [esc(p.name.replace(" (가상)", "")), lgdTxt(p.lgd),
-          p.id === "guarantee" ? `보증 비율 85% ${A}, 비보증분 무담보 45%` : `바젤Ⅱ 기초 내부등급법 감독 LGD ${B}`]))}
-        <h3>선택 확인 항목 ${A}</h3>
-        ${tbl(["항목", "민감도", "특이도", "고객 이탈률", "처리비용"],
-          Object.values(ea.actions).filter((a, i, arr) => arr.findIndex((b) => b.name === a.name) === i)
-            .map((a) => [esc(a.name), a.sens.toFixed(2), a.spec.toFixed(2), pct(a.dropout, 1), man(a.handling)]))}
-        <h3>계산</h3>
-        ${tbl(["단계", "방법"], [
-          ["확률 갱신", "베이즈 정리 (민감도·특이도)"],
-          ["정보가치", "현재 기대손실 − 확인 결과 반영 후 기대손실"],
-          ["순정보가치", "정보가치 − 확인 비용, 양수 항목만 요청"],
-          ["요청 순서", "순정보가치가 큰 항목부터, 결과에 따라 재평가"],
-        ])}</section>
+      </section>
 
-      <section class="card"><h2>내규·모니터링</h2>
-        ${tbl(["항목", "기준"], [
-          ["전결 한도", `${ont.approvalLimits.map((l) => `${man(l.max)} 이하 ${esc(l.role)}`).join(", ")} ${tag("SYN")}`],
-          ["현장 확인", `부동산담보대출 ${tag("SYN")}`],
-          ["모니터링 긴급", sev("긴급")],
-          ["모니터링 검토", sev("검토") + ", 사채 만기"],
-        ])}</section>`;
+      <section class="card"><h2>재무·상환능력 분석</h2>
+        <p>대출 신청 법인 자체의 별도재무제표로 재무 상태를 평가하고, 충격 시나리오에서 원리금 상환 가능 여부를 확인합니다.</p>
+        ${tbl(["단계", "방법", "결과"], [
+          ["재무지표", "부채비율, 유동비율, 차입금의존도, 이자보상배율, 순차입금", "재무 상태"],
+          ["위험 신호", "영업손실, 이자보상배율 1 미만, 단기 상환 부담 등 6개 규칙의 점수", `사전 부도확률 ${A}`],
+          ["상환능력", `기본·매출 ${sd.salesShock}%·금리 +${sd.rateShock}%p·복합 시나리오`, "최소 DSCR (상환재원 ÷ 원리금)"],
+        ])}
+        <p class="note">구간별 사전 부도확률 ${bands}</p>
+      </section>
+
+      <section class="card"><h2>정보가치 기반 추가 확인 선택</h2>
+        <p>추가 자료는 판단을 바꿀 가능성이 있을 때만 가치가 있습니다. 각 자료가 줄이는 기대손실과 확보 비용을 비교해 요청 여부를 결정합니다.</p>
+        ${flow([
+          ["사전 부도확률", "위험 신호 구간"],
+          ["추가 확인", "결과: 우려 또는 양호"],
+          ["확률 갱신", "베이즈 정리"],
+          ["결정", "기대손실이 작은 쪽"],
+        ])}
+        <div class="grid2"><div>
+          <h3>손실과 비용</h3>
+          ${tbl(["구분", "산정"], [
+            ["부도 기업 승인", "대출금 × 부도시손실률(LGD, 상품별)"],
+            ["정상 기업 거절", "대출 기간의 기대 이자이익"],
+            ["확인 비용", "고객 이탈에 따른 이자이익 손실 + 처리비용"],
+          ])}</div><div>
+          <h3>선택 기준</h3>
+          ${tbl(["지표", "정의"], [
+            ["정보가치", "현재 기대손실 − 확인 결과 반영 후 기대손실"],
+            ["순정보가치", "정보가치 − 확인 비용"],
+            ["요청 순서", "순정보가치가 양수인 항목 중 큰 항목부터, 결과에 따라 재평가"],
+          ])}</div></div>
+        <h3>적용 예시: ${esc(co.name)} ${fmt(app.amount)} 신청</h3>
+        ${tbl(["요청 방식", "평균 요청 건수", "확인 비용 + 기대손실"], nba.compare.map((x) => [x === best ? `<b>${esc(x.name)}</b>` : esc(x.name), x.count.toFixed(2), x === best ? `<b>${fmt(x.cost + x.loss, 2)}</b>` : fmt(x.cost + x.loss, 2)]))}
+        <p class="note">${A} 시연 조건의 계산 결과</p>
+      </section>
+
+      <section class="card"><h2>가정과 한계</h2>
+        ${tbl(["항목", "시연 값", "실제 운영 시"], [
+          ["사전 부도확률", "위험 신호 구간별 가정", "신용평가모형의 등급별 부도확률"],
+          ["민감도·특이도", "확인 항목별 가정", "과거 심사 건의 확인 결과와 사후 부도 실적"],
+          ["확인 비용", `고객 이탈률·처리비용 가정, 자금조달금리 ${ea.fundingRate}%`, "신청 철회율·심사 원가 실적"],
+          ["부도시손실률", "바젤Ⅱ 감독 LGD 45%·35%, 보증 비율 85% 가정", "은행 회수 실적 기반 LGD"],
+          ["상품별 내규", "가상은행 기준", "은행 내규"],
+        ])}
+      </section>`;
   }
 
   // ------------------------------------------------------------ 업무 기능 관리 (패키지)
