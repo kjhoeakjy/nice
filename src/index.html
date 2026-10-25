@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>법인대출 심사 PoC</title>
+<style>
+@@include styles/fonts.css@@
+
+@@include styles/base.css@@
+
+@@include styles/theme.css@@
+
+@@include styles/skin.css@@
+
+</style>
+
+  <header class="top">
+    <a class="brand" href="#/home">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M8 23h16M10 13v8M16 13v8M22 13v8M7 12l9-5 9 5z"/></svg>
+      <b>가상은행</b><span>기업여신</span>
+    </a>
+    <div class="meta">
+      <span class="asof">기준일 <b id="asof"></b></span>
+      <div class="user"><span id="avatar" class="avatar"></span><select id="role" title="사용자 전환"></select></div>
+      <button id="reset" class="btn-text" title="시연 데이터를 처음 상태로">초기화</button>
+    </div>
+  </header>
+  <div class="layout">
+    <nav id="nav"></nav>
+    <main id="main"></main>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script>
+// build_data.py 로 생성. 직접 수정하지 않음.
+window.CREDITOS_DATA = @@json data/dart.json@@;
+
+</script>
+<script>
+@@include data/seed.js@@
+
+</script>
+<script>
+@@include js/creditos.js@@
+
+</script>
+<script>
+@@include js/app.js@@
+
+</script>
+
+</body>
+</html>
