@@ -12,6 +12,8 @@ window.CREDITOS_SEED = {
   renewalPolicy: {
     product: "운전자금대출 만기연장",
     version: "내규 2026-07 (가상)",
+    lgd: 0.45, lgdBasis: "무담보 선순위 기업 익스포저: 바젤Ⅱ 기초 내부등급법 감독 LGD 45%",
+    optional: ["R1", "R2", "R3"],
     required: [
       { code: "RENEW", name: "만기연장 신청서", why: "연장 금액·기간 확인" },
       { code: "FS", name: "최근 결산 재무제표", why: "재무 변화 확인", autoSource: "DART 사업보고서에서 자동 확보" },
@@ -83,15 +85,18 @@ window.CREDITOS_SEED = {
         fns: [],
       },
       EXTRA: {
-        name: "추가 확인 항목 선택", owner: "심사역", docs: [], refs: ["위험 신호 구간별 상환곤란 확률"],
+        name: "추가 확인 항목 선택", owner: "심사역", docs: [], refs: ["위험 신호 구간별 부도확률(가정)"],
         criteria: "순정보가치(기대손실 감소 − 확인 비용)가 양수인 항목부터 요청, 확인 결과에 따라 재선정",
         fns: ["nextBestAction"],
       },
     },
     products: [
-      { id: "working", name: "중소법인 운전자금대출", note: "자금 용도·상환능력 확인", tasks: ["AUTH", "FIN", "REPAY", "USE", "TAX", "EXTRA"] },
-      { id: "guarantee", name: "법인 보증부대출 (가상)", note: "보증서 유효성·보증 조건 확인 추가", tasks: ["AUTH", "FIN", "REPAY", "TAX", "GUAR", "EXTRA"] },
-      { id: "realestate", name: "법인 부동산담보대출 (가상)", note: "담보 권리관계·감정평가·현장 확인 추가", tasks: ["AUTH", "FIN", "REPAY", "TAX", "COLL", "SITE", "EXTRA"] },
+      { id: "working", name: "중소법인 운전자금대출", note: "자금 용도·상환능력 확인", tasks: ["AUTH", "FIN", "REPAY", "USE", "TAX", "EXTRA"],
+        lgd: 0.45, lgdBasis: "무담보 선순위 기업 익스포저: 바젤Ⅱ 기초 내부등급법 감독 LGD 45%", optional: ["A1", "A2", "A3", "A4"] },
+      { id: "guarantee", name: "법인 보증부대출 (가상)", note: "보증서 유효성·보증 조건 확인 추가", tasks: ["AUTH", "FIN", "REPAY", "TAX", "GUAR", "EXTRA"],
+        lgd: 0.0675, lgdBasis: "보증 비율 85% 가정. 비보증 부분 15%에 무담보 LGD 45% 적용 (45% × 15%)", optional: ["A1", "A2", "A3", "A4"] },
+      { id: "realestate", name: "법인 부동산담보대출 (가상)", note: "담보 권리관계·감정평가·현장 확인 추가", tasks: ["AUTH", "FIN", "REPAY", "TAX", "COLL", "SITE", "EXTRA"],
+        lgd: 0.35, lgdBasis: "부동산 담보 익스포저: 바젤Ⅱ 기초 내부등급법 적격 부동산 담보 최저 LGD 35%", optional: ["A1", "A2", "A3"] },
     ],
     approvalLimits: [
       { max: 3e9, role: "심사팀장" },
@@ -99,26 +104,19 @@ window.CREDITOS_SEED = {
     ],
   },
 
-  // 정보가치 계산용 가정값. 화면에서 바꿀 수 있다.
+  // 정보가치 계산용 가정값.
+  // 확인 비용 = 고객 이탈률 × 기대 이자이익 + 내부 처리비용. 기대 이자이익 = 대출금 × (대출 금리 − 자금조달금리) × 대출 기간.
+  // 정상 기업 거절 손실 = 기대 이자이익. 부도 시 손실 = 대출금 × LGD (상품별, 심사 온톨로지).
   eviAssumptions: {
-    newLoan: {
-      lgd: 0.45,               // 상환곤란 시 손실률
-      rejectGoodRate: 0.06,    // 정상 기업을 거절할 때 잃는 이익 (대출금 대비, 관계 손실 포함)
-      actions: [
-        { id: "A1", name: "최근 6개월 월별 매출 자료", detail: "부가세 신고서 또는 매출 장부", sens: 0.6, spec: 0.8, cost: 5e6 },
-        { id: "A2", name: "1년 내 만기 차입금·사채 상환 계획", detail: "상환 재원과 차환 협의 현황", sens: 0.7, spec: 0.85, cost: 4e6 },
-        { id: "A3", name: "주요 거래처 계약서", detail: "상위 3개 거래처 납품 계약", sens: 0.5, spec: 0.75, cost: 8e6 },
-        { id: "A4", name: "사업장 현장 실사", detail: "생산 설비 가동 상태와 재고 확인", sens: 0.55, spec: 0.9, cost: 3e7 },
-      ],
-    },
-    renewal: {
-      lgd: 0.45,
-      rejectGoodRate: 0.05,
-      actions: [
-        { id: "R1", name: "2026년 반기 재무제표 확인", detail: "약정상 제출 자료. DART 반기보고서와 대조", sens: 0.65, spec: 0.85, cost: 2e6 },
-        { id: "R2", name: "유상증자 대금 사용 내역", detail: "2026-06 제3자배정 유상증자 32억", sens: 0.5, spec: 0.8, cost: 3e6 },
-        { id: "R3", name: "사업장 현장 실사", detail: "생산 설비 가동 상태 확인", sens: 0.55, spec: 0.9, cost: 3e7 },
-      ],
+    fundingRate: 3.8,          // 자금조달금리 (%, 가정)
+    actions: {
+      A1: { name: "최근 6개월 월별 매출 자료", detail: "부가세 신고서 또는 매출 장부", sens: 0.6, spec: 0.8, dropout: 0.025, handling: 5e5 },
+      A2: { name: "1년 내 만기 차입금·사채 상환 계획", detail: "상환 재원과 차환 협의 현황", sens: 0.7, spec: 0.85, dropout: 0.02, handling: 4e5 },
+      A3: { name: "주요 거래처 계약서", detail: "상위 3개 거래처 납품 계약", sens: 0.5, spec: 0.75, dropout: 0.04, handling: 8e5 },
+      A4: { name: "사업장 현장 실사", detail: "생산 설비 가동 상태와 재고 확인", sens: 0.55, spec: 0.9, dropout: 0.15, handling: 3e6 },
+      R1: { name: "2026년 반기 재무제표 확인", detail: "약정상 제출 자료. DART 반기보고서와 대조", sens: 0.65, spec: 0.85, dropout: 0.03, handling: 4e5 },
+      R2: { name: "유상증자 대금 사용 내역", detail: "2026-06 유상증자결정 공시 관련 자금 사용 확인", sens: 0.5, spec: 0.8, dropout: 0.05, handling: 3e5 },
+      R3: { name: "사업장 현장 실사", detail: "생산 설비 가동 상태 확인", sens: 0.55, spec: 0.9, dropout: 0.15, handling: 3e6 },
     },
   },
 

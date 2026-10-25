@@ -41,7 +41,7 @@ flowchart TB
 
 ## 상태
 
-저장 위치: `localStorage["creditos-demo-v1"]`. 저장값이 없거나 손상된 경우 `seed.js` 기준으로 초기화합니다.
+저장 위치: `localStorage["creditos-demo-v2"]`. 저장값이 없거나 손상된 경우 `seed.js` 기준으로 초기화합니다.
 
 | 키 | 내용 |
 |---|---|
@@ -51,7 +51,6 @@ flowchart TB
 | `tasks`, `events` | 모니터링 검토 업무, 사건 처리 상태 |
 | `audit` | 처리 기록 |
 | `scenario` | 심사 건별 상환여력 시나리오 입력값 |
-| `evi` | 정보가치 계산 가정값 (화면에서 수정 가능) |
 | `seq` | 일련번호 |
 
 ## 경로
@@ -62,6 +61,7 @@ flowchart TB
 |---|---|---|
 | `#/home` | `pageHome` | 업무 현황 |
 | `#/workflow` | `pageWorkflow` | 심사 온톨로지 |
+| `#/basis` | `pageBasis` | 산정 기준 |
 | `#/company/<corp_code>` | `pageCompany` | 기업 정보 |
 | `#/case/<id>` | `pageCase` | 심사 화면 (신규·만기연장 공통) |
 | `#/loans`, `#/loan/<id>` | `pageLoans`, `pageLoan` | 실행 여신 |

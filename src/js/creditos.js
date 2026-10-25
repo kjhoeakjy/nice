@@ -263,7 +263,7 @@
     const b = BANDS.find((x) => score <= x.max);
     return { year: y, hits, all: RISK_RULES.map((r) => ({ text: r.text, pts: r.pts, hit: hits.includes(r) })),
       score, band: b.band, prior: b.p,
-      note: "규칙 점수와 구간별 상환곤란 확률은 시연용 가정입니다. 실제 신용평가모형이나 은행 내부 PD가 아닙니다." };
+      note: "규칙 점수와 구간별 부도확률은 시연용 가정입니다. 실제 신용평가모형이나 은행 내부 PD가 아닙니다." };
   }
 
   // ------------------------------------------------------------ 상환여력 시나리오
@@ -315,13 +315,13 @@
       results,
       assumptions: [
         `기준 연도: ${y}년 별도재무제표 (DART 공시값)`,
-        `상환재원: ${params.basis === "op_cf" ? "영업활동현금흐름" : "영업이익"}. 감가상각비·이자지급액이 공시 데이터에서 분리되지 않아 단순화했습니다.`,
+        `상환재원: ${params.basis === "op_cf" ? "영업활동현금흐름. 이자지급을 영업활동으로 분류한 기업은 이미 이자가 차감되어 있어 보수적으로 산출됩니다." : "영업이익 (감가상각비 미가산)"}`,
         `기존 차입금 ${fmtEok(debt.total)}에 연 ${params.existingRate}% 이자를 가정했습니다 (실제 약정금리 미확인).`,
         `1년 내 만기 차입금 ${fmtEok(debt.dueWithinYear)} 중 ${params.refinanceRatio}%는 차환된다고 가정했습니다.`,
         "신규 대출 금액·금리·만기·상환방식은 가상 신청 조건입니다.",
         "매출 이외의 조건(원가율, 운전자본)은 기준 연도와 같다고 가정했습니다.",
       ],
-      caution: "결과는 가정에 따른 시나리오 값이며, 실제 DSCR 약정이나 승인 기준과 같지 않습니다.",
+      caution: "결과는 가정에 따른 시나리오 값이며 실제 DSCR 약정이나 승인 기준과 같지 않습니다.",
     };
   }
 
@@ -387,7 +387,7 @@
   }
 
   // ------------------------------------------------------------ 다음 업무 추천 (정보가치)
-  // 상태: 상환곤란(B) / 정상(G). 결정: 승인 / 거절.
+  // 상태: 부도(B) / 정상(G). 결정: 승인 / 거절.
   // 각 선택 확인 a 는 '우려' 또는 '양호' 결과를 준다. P(우려|B)=sens, P(우려|G)=1-spec.
   function bayes(p, sens, spec, concern) {
     const pc = concern ? sens : 1 - sens;
@@ -533,6 +533,8 @@
 
   global.CreditOS = {
     registry, callLog, call, LABELS, fmtEok, ymd, parseKoDate, monthsBetween, latestYear, availableYears, val, item,
+    // 산정 기준 화면용 규칙 정의
+    meta: { RISK_RULES: RISK_RULES.map((r) => ({ id: r.id, text: r.text, pts: r.pts })), BANDS, DEBT_PARTS, EVENT_SEVERITY },
     // 테스트용 내부 함수
     _: { bayes, decisionLoss, evi, greedyValue, allValue, ratio },
   };
