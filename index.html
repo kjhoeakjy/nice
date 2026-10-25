@@ -587,6 +587,19 @@ nav::-webkit-scrollbar { height: 0; }
 }
 @media (max-width: 600px) { .workflow-controls label { flex-basis: 100%; } }
 
+/* 자동 시연 */
+.demo-btn { background: var(--yellow); border-color: var(--yellow); color: var(--top); font-weight: 600; padding: 4px 10px; font-size: 12px; }
+.demo-btn:hover { background: #F0B800; border-color: #F0B800; color: var(--top); }
+.demo-panel { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 50; width: min(560px, calc(100vw - 24px));
+  background: var(--top); color: #fff; border-radius: 6px; padding: 12px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.demo-panel .demo-bar { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--yellow); font-weight: 600; }
+.demo-panel .demo-bar button { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+.demo-panel p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; }
+.demo-hl { outline: 3px solid var(--yellow); outline-offset: 3px; border-radius: 4px; transition: outline-color .2s; }
+.demo-running .toast { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+.demo-btn { white-space: nowrap; flex: none; }
+@media (max-width: 600px) { .demo-btn { padding: 3px 8px; font-size: 11.5px; } .top .user select { max-width: 104px; } .top .meta { gap: 6px; } }
+
 </style>
 
   <header class="top">
@@ -597,6 +610,7 @@ nav::-webkit-scrollbar { height: 0; }
     <div class="meta">
       <span class="asof">기준일 <b id="asof"></b></span>
       <div class="user"><span id="avatar" class="avatar"></span><select id="role" title="사용자 전환"></select></div>
+      <button id="demo" class="demo-btn" title="시연 자동 진행">자동 시연</button>
       <button id="reset" class="btn-text" title="시연 데이터를 처음 상태로">초기화</button>
     </div>
   </header>
@@ -2321,6 +2335,7 @@ window.CREDITOS_SEED = {
       ["만기연장·사후 모니터링", "심사역", "만기 도래 여신의 연장 심사 시작, 검토 대상 공시의 검토 업무 생성", `<a href="#/loans">실행 여신</a> · <a href="#/monitor">사후 모니터링</a>`],
     ];
     return `<h1>사용 방법</h1>
+      <section class="card"><div class="row-between"><div><h2>자동 시연</h2><p class="small">심사 절차 구성부터 승인까지 자동 진행 (약 1분)</p></div><button type="button" data-demo-start>자동 시연 시작</button></div></section>
       <section class="card"><h2>사용자</h2>
         <table class="t"><tr><th>사용자</th><th>역할</th><th></th></tr>
           ${SEED.users.map((x) => `<tr><td class="nw">${esc(x.name)}</td><td>${esc(x.role)}${x.canApprove ? ` (전결 한도 ${fmt(x.canApprove)})` : ""}</td><td>${x.id === S.role ? `<span class="muted">현재 사용자</span>` : roleBtn(x.id)}</td></tr>`).join("")}</table>
@@ -2392,13 +2407,15 @@ window.CREDITOS_SEED = {
   // ------------------------------------------------------------ 이벤트
   const INIT = {};
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("button, [data-tab], [data-scope], [data-disc], [data-otask], [data-role]");
+    const t = e.target.closest("button, [data-tab], [data-scope], [data-disc], [data-otask], [data-role], [data-demo-stop], [data-demo-start]");
     if (!t) return;
     const r = route();
     if (t.dataset.tab) { companyTab = t.dataset.tab; render(); return; }
     if (t.dataset.scope) { fsScope = t.dataset.scope; render(); return; }
     if (t.dataset.disc) { discFilter = t.dataset.disc; render(); return; }
     if (t.dataset.otask) { workflowSelection.taskId = t.dataset.otask; keep(); render(); return; }
+    if (t.hasAttribute("data-demo-stop")) { demoClose(); return; }
+    if (t.hasAttribute("data-demo-start")) { runDemo(); return; }
     if (t.dataset.role) { S.role = t.dataset.role; save(); location.hash = user().customerOf ? "#/portal" : "#/home"; render(); return; }
     const act = t.dataset.act;
     if (!act) return;
@@ -2465,6 +2482,155 @@ window.CREDITOS_SEED = {
     clearTimeout(resetArmed); resetArmed = 0; e.target.textContent = "초기화";
     S = initialState(); save(); location.hash = "#/home"; render(); toast("처음 상태로 되돌렸습니다");
   });
+
+
+  // ------------------------------------------------------------ 자동 시연
+  // 실제 화면과 업무 처리(runAction)를 순서대로 실행하고 하단 패널에 단계 설명을 표시한다.
+  const demo = { on: false, step: 0, total: 0 };
+  const DEMO_PACE = 2600;
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+  function demoPanel(text, done) {
+    let el = document.getElementById("demo-panel");
+    if (!el) { el = document.createElement("div"); el.id = "demo-panel"; el.className = "demo-panel"; document.body.appendChild(el); }
+    el.innerHTML = `<div class="demo-bar"><span>자동 시연 ${done ? "완료" : `${demo.step} / ${demo.total}`}</span>
+      <button type="button" class="ghost small" data-demo-stop>${done ? "닫기" : "중지"}</button></div><p>${esc(text)}</p>`;
+  }
+
+  function demoClose() {
+    demo.on = false;
+    document.body.classList.remove("demo-running");
+    document.querySelectorAll(".demo-hl").forEach((x) => x.classList.remove("demo-hl"));
+    const el = document.getElementById("demo-panel");
+    if (el) el.remove();
+  }
+
+  async function demoWait(ms) {
+    await sleep(ms);
+    if (!demo.on) throw new Error("stopped");
+  }
+
+  function demoMark(sel) {
+    document.querySelectorAll(".demo-hl").forEach((x) => x.classList.remove("demo-hl"));
+    const el = typeof sel === "string" ? document.querySelector(sel) : sel;
+    if (!el) return null;
+    el.classList.add("demo-hl");
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    return el;
+  }
+
+  async function demoGo(hash) {
+    window.__keepScroll = 0;
+    if (location.hash === hash) render(); else location.hash = hash;
+    await demoWait(350);
+  }
+
+  async function demoRole(id, hash) {
+    S.role = id; save();
+    await demoGo(hash);
+  }
+
+  async function demoWorkflow(patch) {
+    Object.assign(workflowSelection, patch);
+    window.__keepScroll = window.scrollY;
+    render();
+    await demoWait(300);
+  }
+
+  async function demoClickAll(sel) {
+    for (let i = 0; i < 12; i++) {
+      const b = document.querySelector(sel);
+      if (!b) break;
+      demoMark(b);
+      await demoWait(450);
+      keep(); b.click();
+      await demoWait(250);
+    }
+  }
+
+  async function runDemo() {
+    if (demo.on) return;
+    demo.on = true;
+    document.body.classList.add("demo-running");
+    let caseId = null;
+    const steps = [
+      ["시연 데이터를 초기화하고 심사 온톨로지 화면으로 이동", async () => {
+        S = initialState(); save();
+        Object.assign(workflowSelection, { productId: "working", applicant: "proxy", companyType: "listed", amountEok: 30, taskId: "AUTH" });
+        await demoGo("#/workflow");
+      }],
+      ["차입 권한 확인 업무에 필요 자료·제출 방식·담당·판단 기준·최종 승인이 연결된 구조", async () => { demoMark(".onto-hub"); }],
+      ["대표이사 신청으로 변경: 위임장 요청 제외", async () => { await demoWorkflow({ applicant: "representative" }); demoMark(".onto-node.l2"); }],
+      ["신청 금액 50억 원으로 변경: 최종 승인자가 본부 심사위원회로 변경", async () => { await demoWorkflow({ applicant: "proxy", amountEok: 50 }); demoMark(".onto-node.r3"); }],
+      ["부동산담보대출 선택: 담보 확인·담보 현장 확인 업무 추가", async () => { await demoWorkflow({ amountEok: 30, productId: "realestate" }); demoMark(".workflow-product.selected"); }],
+      ["선택 조건으로 심사 건 생성", async () => {
+        const b = demoMark("[data-act=CreateCaseFromWorkflow]");
+        await demoWait(900);
+        const before = S.cases.length;
+        b.click();
+        await demoWait(400);
+        caseId = S.cases.length > before ? S.cases[S.cases.length - 1].id : null;
+        if (!caseId) throw new Error("stopped");
+        await demoGo("#/case/" + caseId);
+        demoMark("#step-2");
+      }],
+      ["심사 온톨로지에서 구성된 심사 업무별 필요 자료를 고객에게 온라인 요청", async () => {
+        await demoClickAll('#step-2 [data-act=RequestDocument][data-reason="필수 자료"]');
+      }],
+      ["담보 현장 확인은 온라인 제출 대상에서 제외, 은행 담당자가 결과 기록", async () => {
+        const f = demoMark('#step-2 form[data-form="onsite"]');
+        if (f) { await demoWait(700); f.querySelector("[name=note]").value = "담보 건물 현황과 감정평가 내용 일치"; keep(); f.requestSubmit(); await demoWait(300); }
+      }],
+      ["고객(최민수) 화면에서 요청 자료 제출", async () => {
+        await demoRole("c1", "#/portal");
+        demoMark("main section.card:last-of-type");
+        const c = caseById(caseId);
+        for (const r of c.requests.filter((x) => x.status === "요청됨")) {
+          await demoWait(400);
+          runAction("SubmitDocument", { caseId, reqId: r.id, file: r.name.replace(/\s/g, "") + ".pdf" });
+        }
+      }],
+      ["심사역(김연주)이 제출 자료 확인 완료", async () => {
+        await demoRole("u1", "#/case/" + caseId);
+        await demoClickAll('main [data-act=ReviewDocument][data-result="확인 완료"], main [data-act=ReviewUploadedDocument]');
+        demoMark("#step-2 table.t");
+      }],
+      ["재무지표 산출과 위험 신호", async () => { demoMark("#step-3"); }],
+      ["시나리오별 최소 DSCR로 상환능력 분석", async () => { demoMark("#step-4"); }],
+      ["순정보가치(정보가치 − 확인 비용)가 양수인 항목만 요청, 요청 방식 비교", async () => { demoMark("#step-5"); }],
+      ["심사 의견 기록", async () => {
+        const f = demoMark('form[data-form="opinion"]');
+        await demoWait(600);
+        f.querySelector("[name=text]").value = "담보·필요 자료 확인 완료, 승인 의견";
+        keep(); f.requestSubmit();
+        await demoWait(300);
+      }],
+      ["전결권자(심사팀장 이준호) 승인", async () => {
+        await demoRole("u2", "#/case/" + caseId);
+        const f = demoMark('form[data-form="decision"]');
+        await demoWait(900);
+        keep(); f.requestSubmit(f.querySelector('button[value="승인"]'));
+        await demoWait(300);
+      }],
+      ["신청부터 승인까지 비대면 처리 완료", async () => { window.scrollTo({ top: 0, behavior: "smooth" }); demoMark(".stepper"); }],
+    ];
+    demo.total = steps.length;
+    try {
+      for (let i = 0; i < steps.length; i++) {
+        demo.step = i + 1;
+        demoPanel(steps[i][0]);
+        await steps[i][1]();
+        await demoWait(DEMO_PACE);
+      }
+      demoPanel("시연 종료. 다시 보려면 상단의 '자동 시연'을 누르세요.", true);
+      demo.on = false;
+    } catch (err) {
+      if (demo.on) console.error(err);
+      demoClose();
+    }
+  }
+
+  document.getElementById("demo").addEventListener("click", () => { if (demo.on) demoClose(); else runDemo(); });
 
   window.addEventListener("hashchange", render);
   document.getElementById("asof").textContent = ASOF;
