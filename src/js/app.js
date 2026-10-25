@@ -914,14 +914,11 @@
   function pageGuide() {
     const roleBtn = (id) => { const x = SEED.users.find((u) => u.id === id); return `<button type="button" class="ghost small" data-role="${id}">${esc(x.name)}${(x.name.charCodeAt(x.name.length - 1) - 0xac00) % 28 && (x.name.charCodeAt(x.name.length - 1) - 0xac00) % 28 !== 8 ? "으로" : "로"} 전환</button>`; };
     const steps = [
-      ["심사 절차 구성", "심사역", "대출 상품·신청인·기업 정보·신청 금액 선택 후 '절차 구성'. 심사 업무 버튼으로 업무별 자료·담당·판단 기준·최종 승인 확인", `<a href="#/workflow">심사 온톨로지</a>`],
-      ["심사 건 생성", "심사역", "'이 조건으로 심사 건 생성' 또는 기존 신청 건 선택", `<a href="#/case/APP-2026-0412">기존 신청 건</a>`],
-      ["필요 자료 요청·확인", "심사역", "심사 화면 2단계에서 미제출 자료 '요청', 접수 자료 '확인 완료', 현장 확인 결과 기록", ""],
-      ["자료 제출", "고객", "고객 화면에서 요청 자료 파일 선택 후 제출 (파일명만 기록)", roleBtn("c1")],
-      ["추가 확인 항목 선택", "심사역", "심사 화면 5단계에서 순정보가치가 양수인 항목 '요청'", `<a href="#/case/APP-2026-0412/evi">추가 확인 선택</a>`],
-      ["심사 의견", "심사역", "심사 화면 6단계에서 의견 기록", roleBtn("u1")],
-      ["승인", "심사팀장", "필요 자료 확인 완료 후 승인·조건부 승인·거절", roleBtn("u2")],
-      ["만기연장·사후 모니터링", "심사역", "만기 도래 여신의 연장 심사 시작, 검토 대상 공시의 검토 업무 생성", `<a href="#/loans">실행 여신</a> · <a href="#/monitor">사후 모니터링</a>`],
+      ["심사 절차 구성", "심사역", "상품·신청인·금액을 선택하고 심사 업무별 연결 구조 확인", `<a href="#/workflow">심사 온톨로지</a>`],
+      ["심사 건 생성·자료 요청", "심사역", "'이 조건으로 심사 건 생성' 후 필요 자료 요청", `<a href="#/case/APP-2026-0412">기존 신청 건</a>`],
+      ["자료 제출", "고객", "요청 자료 제출", roleBtn("c1")],
+      ["자료 확인·추가 확인 선택", "심사역", "제출 자료 확인 완료, 순정보가치가 양수인 항목 요청, 의견 기록", roleBtn("u1")],
+      ["승인", "심사팀장", "전결권자 승인", roleBtn("u2")],
     ];
     return `<h1>사용 방법</h1>
       <section class="card"><h2>시연 순서</h2>
@@ -1070,7 +1067,7 @@
   // ------------------------------------------------------------ 자동 시연
   // 실제 화면과 업무 처리(runAction)를 순서대로 실행하고 하단 패널에 단계 설명을 표시한다.
   const demo = { on: false, step: 0, total: 0 };
-  const DEMO_PACE = 2600;
+  const DEMO_PACE = 3600;
   const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
   function demoPanel(text, done) {
@@ -1137,65 +1134,46 @@
     document.body.classList.add("demo-running");
     let caseId = null;
     const steps = [
-      ["시연 데이터를 초기화하고 심사 온톨로지 화면으로 이동", async () => {
+      ["심사 온톨로지: 심사 업무마다 필요 자료·담당·판단 기준·최종 승인이 연결된 구조", async () => {
         S = initialState(); save();
         Object.assign(workflowSelection, { productId: "working", applicant: "proxy", companyType: "listed", amountEok: 30, taskId: "AUTH" });
         await demoGo("#/workflow");
+        demoMark(".onto-hub");
       }],
-      ["차입 권한 확인 업무에 필요 자료·제출 방식·담당·판단 기준·최종 승인이 연결된 구조", async () => { demoMark(".onto-hub"); }],
-      ["대표이사 신청으로 변경: 위임장 요청 제외", async () => { await demoWorkflow({ applicant: "representative" }); demoMark(".onto-node.l2"); }],
-      ["신청 금액 50억 원으로 변경: 최종 승인자가 본부 심사위원회로 변경", async () => { await demoWorkflow({ applicant: "proxy", amountEok: 50 }); demoMark(".onto-node.r3"); }],
-      ["부동산담보대출 선택: 담보 확인·담보 현장 확인 업무 추가", async () => { await demoWorkflow({ amountEok: 30, productId: "realestate" }); demoMark(".workflow-product.selected"); }],
-      ["선택 조건으로 심사 건 생성", async () => {
-        const b = demoMark("[data-act=CreateCaseFromWorkflow]");
-        await demoWait(900);
+      ["상품을 부동산담보대출로 바꾸면 담보 확인·현장 확인 업무가 추가된 절차로 구성", async () => {
+        await demoWorkflow({ productId: "realestate" });
+        demoMark(".workflow-product.selected");
+      }],
+      ["구성된 절차로 심사 건을 만들고 필요 자료를 온라인으로 요청·제출·확인", async () => {
         const before = S.cases.length;
-        b.click();
+        demoMark("[data-act=CreateCaseFromWorkflow]");
+        await demoWait(800);
+        document.querySelector("[data-act=CreateCaseFromWorkflow]").click();
         await demoWait(400);
         caseId = S.cases.length > before ? S.cases[S.cases.length - 1].id : null;
         if (!caseId) throw new Error("stopped");
         await demoGo("#/case/" + caseId);
+        const c = caseById(caseId);
+        policyFor(c).items.filter((i) => i.status === "미제출" && !(policyFor(c).workflow.onsite.some((x) => x.code === i.code)))
+          .forEach((i) => runAction("RequestDocument", { caseId, code: i.code, name: i.name, reason: "필수 자료" }));
+        policyFor(c).workflow.onsite.forEach((x) => runAction("RecordSiteInspection", { caseId, code: x.code, note: "담보 현황과 감정평가 내용 일치" }));
+        S.role = "c1";
+        c.requests.filter((r) => r.status === "요청됨").forEach((r) => runAction("SubmitDocument", { caseId, reqId: r.id, file: r.name.replace(/\s/g, "") + ".pdf" }));
+        S.role = "u1"; save();
+        c.requests.filter((r) => r.status === "제출됨").forEach((r) => runAction("ReviewDocument", { caseId, reqId: r.id, result: "확인 완료" }));
+        await demoGo("#/case/" + caseId);
         demoMark("#step-2");
       }],
-      ["심사 온톨로지에서 구성된 심사 업무별 필요 자료를 고객에게 온라인 요청", async () => {
-        await demoClickAll('#step-2 [data-act=RequestDocument][data-reason="필수 자료"]');
-      }],
-      ["담보 현장 확인은 온라인 제출 대상에서 제외, 은행 담당자가 결과 기록", async () => {
-        const f = demoMark('#step-2 form[data-form="onsite"]');
-        if (f) { await demoWait(700); f.querySelector("[name=note]").value = "담보 건물 현황과 감정평가 내용 일치"; keep(); f.requestSubmit(); await demoWait(300); }
-      }],
-      ["고객(김고객) 화면에서 요청 자료 제출", async () => {
-        await demoRole("c1", "#/portal");
-        demoMark("main section.card:last-of-type");
-        const c = caseById(caseId);
-        for (const r of c.requests.filter((x) => x.status === "요청됨")) {
-          await demoWait(400);
-          runAction("SubmitDocument", { caseId, reqId: r.id, file: r.name.replace(/\s/g, "") + ".pdf" });
-        }
-      }],
-      ["심사역(김연주)이 제출 자료 확인 완료", async () => {
-        await demoRole("u1", "#/case/" + caseId);
-        await demoClickAll('main [data-act=ReviewDocument][data-result="확인 완료"], main [data-act=ReviewUploadedDocument]');
-        demoMark("#step-2 table.t");
-      }],
-      ["재무지표 산출과 위험 신호", async () => { demoMark("#step-3"); }],
-      ["시나리오별 최소 DSCR로 상환능력 분석", async () => { demoMark("#step-4"); }],
-      ["순정보가치(정보가치 − 확인 비용)가 양수인 항목만 요청, 요청 방식 비교", async () => { demoMark("#step-5"); }],
-      ["심사 의견 기록", async () => {
-        const f = demoMark('form[data-form="opinion"]');
-        await demoWait(600);
-        f.querySelector("[name=text]").value = "담보·필요 자료 확인 완료, 승인 의견";
-        keep(); f.requestSubmit();
-        await demoWait(300);
-      }],
-      ["전결권자(심사팀장 김팀장) 승인", async () => {
+      ["재무지표와 시나리오별 최소 DSCR로 상환능력 분석", async () => { demoMark("#step-4"); }],
+      ["순정보가치가 양수인 추가 확인 항목만 요청: 비용과 기대손실 합계 최소", async () => { demoMark("#step-5"); }],
+      ["심사 의견 기록 후 전결권자(김팀장) 승인: 신청부터 승인까지 비대면 처리", async () => {
+        runAction("RecordOpinion", { caseId, text: "필요 자료·담보 확인 완료", recommendation: "승인 의견" });
         await demoRole("u2", "#/case/" + caseId);
-        const f = demoMark('form[data-form="decision"]');
-        await demoWait(900);
-        keep(); f.requestSubmit(f.querySelector('button[value="승인"]'));
-        await demoWait(300);
+        runAction("RecordDecision", { caseId, decision: "승인", comment: "" });
+        await demoGo("#/case/" + caseId);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        demoMark(".stepper");
       }],
-      ["신청부터 승인까지 비대면 처리 완료", async () => { window.scrollTo({ top: 0, behavior: "smooth" }); demoMark(".stepper"); }],
     ];
     demo.total = steps.length;
     try {
