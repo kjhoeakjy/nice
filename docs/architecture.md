@@ -61,6 +61,7 @@ flowchart TB
 | 해시 | 화면 함수 | 화면 |
 |---|---|---|
 | `#/home` | `pageHome` | 업무 현황 |
+| `#/workflow` | `pageWorkflow` | 상품별 심사 온톨로지 |
 | `#/company/<corp_code>` | `pageCompany` | 기업 정보 |
 | `#/case/<id>` | `pageCase` | 심사 화면 (신규·만기연장 공통) |
 | `#/loans`, `#/loan/<id>` | `pageLoans`, `pageLoan` | 실행 여신 |
@@ -69,21 +70,50 @@ flowchart TB
 | `#/audit` | `pageAudit` | 처리 기록 |
 | `#/portal` | `pagePortal` | 고객 화면 (고객 전용) |
 
-이벤트는 `document` 단위 위임 방식으로 처리합니다. 버튼 `data-act` 는 업무 처리 이름, 폼 `data-form` 은 처리 종류(`scenario`, `evi`, `opinion`, `decision`, `assign`, `close`, `submit`)입니다.
+이벤트는 `document` 단위 위임 방식으로 처리합니다. 버튼 `data-act` 는 업무 처리 이름, 폼 `data-form` 은 처리 종류(`workflow`, `onsite`, `scenario`, `evi`, `opinion`, `decision`, `assign`, `close`, `submit`)입니다.
 
 ## 업무 처리
 
 | 이름 | 내용 | 실행 역할 |
 |---|---|---|
+| `CreateCaseFromWorkflow` | 상품별 심사 온톨로지의 선택 조건으로 가상 신청 건 생성 (상장기업 조건만) | 심사역, 심사팀장 |
 | `RequestDocument` | 고객 자료 요청 | 심사역, 심사팀장 |
-| `SubmitDocument` | 요청 자료 제출 (파일명만 기록) | 고객 |
-| `ReviewDocument` | 제출 자료 확인 완료 또는 보완 요청 | 심사역, 심사팀장 |
+| `SubmitDocument` | 요청 자료 제출 (파일명만 기록, 본인 기업 신청 건만) | 고객 |
+| `ReviewUploadedDocument` | 신청 시 접수된 서류의 확인 완료 처리 | 심사역, 심사팀장 |
+| `ReviewDocument` | 요청 자료 확인 완료 또는 보완 요청 | 심사역, 심사팀장 |
+| `RecordSiteInspection` | 현장 확인 근거 기록 (시연용 문구, 실제 실사 아님) | 심사역, 심사팀장 |
 | `AssignReviewer` | 담당 심사역 배정 | 심사팀장 |
 | `RecordOpinion` | 심사 의견 기록 | 심사역, 심사팀장 |
-| `RecordDecision` | 승인·조건부 승인·거절. 전결 한도, 의견 기록, 필수 자료 확인 여부 사전 점검 | 전결 권한 보유자 |
+| `RecordDecision` | 승인·조건부 승인·거절. 전결 한도, 의견 기록, 필수 확인 항목의 확인 완료 여부 사전 점검 | 전결 권한 보유자 |
 | `StartRenewalReview` | 만기연장 심사 건 생성 (만기 60일 전부터) | 심사역, 심사팀장 |
 | `CreateMonitoringTask` | 모니터링 사건의 검토 업무 등록 | 심사역, 심사팀장 |
 | `CloseEvent` | 모니터링 사건 종결 (종결 사유 필수) | 심사역, 심사팀장 |
+
+## 상품별 심사 절차 온톨로지
+
+`seed.js` 의 `processOntology` 에 확인 항목과 상품별 규칙을 정의합니다. 신규 심사의 필수 확인 항목은 이 정의에서 구성됩니다.
+
+| 구성 | 내용 |
+|---|---|
+| `checks` | 확인 항목별 명칭, 확인 사유, 처리 방식(온라인 제출·자동 수집·현장 확인), 자료 출처, 담당, 적용 조건 |
+| `products` | 상품별 필수 확인 항목 목록 (운전자금대출, 보증부대출, 부동산담보대출) |
+| `approvalLimits` | 신청 금액별 전결권자 |
+
+| 조건 | 절차 변화 |
+|---|---|
+| 대출 상품 | 보증부대출: 보증서·보증 조건 추가. 부동산담보대출: 권리관계 서류·감정평가서·현장 확인 추가 |
+| 신청인 | 대리 신청 시 대표이사 위임장 추가 |
+| 기업 정보 | 상장기업은 재무제표 DART 자동 확보, 비상장·공시 부족은 고객 제출 |
+| 신청 금액 | 30억 원 이하 심사팀장, 100억 원 이하 본부 심사위원회 |
+
+| 처리 단계 | 내용 |
+|---|---|
+| 절차 구성 | `workflowFor(case)` 가 신청 건의 상품·대표권 확인 결과·금액으로 `compileWorkflow` 호출 |
+| 충족 판정 | `policyFor(case)` 가 구성된 정책으로 `policyCheck` 호출. 확인 완료·자동 확보·해당 없음만 충족 |
+| 승인 사전 점검 | `RecordDecision` 이 미충족 항목이 있으면 승인 차단 |
+| 현장 확인 | 고객 제출 대상에서 제외, 은행 담당자의 확인 기록으로만 충족 |
+
+만기연장 심사는 `renewalPolicy` 를 사용합니다.
 
 ## 업무 패키지
 
@@ -91,7 +121,7 @@ flowchart TB
 
 | 패키지 | 상태 | 추가 기능 |
 |---|---|---|
-| 신규 운전자금 심사 (`new-credit`) | 사용 중 | summarizeDebt, calcRatios, validateFacts, checkAuthority, riskSignals, simulateRepayment, policyCheck, nextBestAction |
+| 신규 운전자금 심사 (`new-credit`) | 사용 중 | summarizeDebt, calcRatios, validateFacts, checkAuthority, riskSignals, simulateRepayment, compileWorkflow, policyCheck, nextBestAction |
 | 만기연장 심사 (`renewal`) | 사용 중 | checkCovenants |
 | 공시 기반 사후 모니터링 (`monitoring`) | 시범 | detectMonitoringEvents |
 

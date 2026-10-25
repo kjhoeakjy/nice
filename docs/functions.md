@@ -20,6 +20,7 @@
 | `riskSignals(company, asOf)` | 0.9.0 | 분석 | 설명용 위험 신호 규칙 |
 | `simulateRepayment(company, asOf, params)` | 1.0.0 | 시뮬레이션 | 상환여력 시나리오 |
 | `policyCheck(application, documents, policy, authority)` | 1.0.0 | 정책 | 필수 서류·전결 권한 점검 |
+| `compileWorkflow(ctx, ontology)` | 1.0.0 | 온톨로지 | 상품·신청인·기업 정보·금액 조건별 심사 절차 구성 |
 | `nextBestAction(prior, actions, loss)` | 1.0.0 | 의사결정 | 추가 확인 항목의 정보가치 |
 | `detectMonitoringEvents(company, since, until, loans)` | 1.0.0 | 모니터링 | 공시 사건 감지 |
 | `checkCovenants(company, asOf, covenants)` | 1.0.0 | 정책 | 약정 점검 |
@@ -66,7 +67,7 @@
 |---|---|
 | 대표이사 판별 | 사업보고서 임원현황의 직위에 "대표" 포함 |
 | 대리 신청 판정 | 신청인 이름이 공시상 대표이사와 불일치 |
-| 결과 | `needsPowerOfAttorney: true` 이면 `policyCheck` 에서 대표이사 위임장(`POA`)을 필수 서류로 추가 |
+| 결과 | `needsPowerOfAttorney: true` 이면 `compileWorkflow` 에서 대표이사 위임장(`POA`)을 필수 확인 항목으로 추가 |
 | 한계 | 이름 비교는 참고용, 법인등기로 최종 확인 |
 
 ## riskSignals
@@ -125,12 +126,39 @@ $$
 
 | 서류 상태 | 조건 |
 |---|---|
-| 해당 없음 | 대리 신청이 아닌 경우의 위임장 |
+| 해당 없음 | 대리 신청이 아닌 경우의 위임장 (`when: "proxy"` 항목) |
 | 자동 확보 | DART 재무제표 |
-| 미제출 | 제출 서류 없음 |
-| 제출 서류 상태 | 제출됨, 확인 완료, 보완 요청 등 |
+| 충족 | 심사역 확인 완료 |
+| 미충족 | 미제출, 요청됨, 제출됨, 보완 요청 |
+
+제출됨 상태는 심사역 확인 전까지 미충족으로 처리합니다.
 
 전결 권한: 대출 금액 30억 원 이하 심사팀장, 100억 원 이하 본부 심사위원회.
+
+## compileWorkflow
+
+| 입력 | 내용 |
+|---|---|
+| `ctx.productId` | `working` 운전자금대출, `guarantee` 보증부대출, `realestate` 부동산담보대출 |
+| `ctx.isProxy` | 대리 신청 여부 |
+| `ctx.companyType` | `listed` 상장기업, `unlisted` 비상장·공시 부족 |
+| `ctx.amount` | 신청 금액 |
+| `ontology` | `seed.js` 의 `processOntology` |
+
+| 규칙 | 내용 |
+|---|---|
+| 위임장 | 대리 신청인 경우에만 포함 |
+| 재무제표 | 상장기업은 DART 자동 확보, 그 외는 고객 온라인 제출 |
+| 현장 확인 | `type: "onsite"` 항목을 온라인 경로와 분리 |
+| 전결권자 | `approvalLimits` 에서 신청 금액으로 결정 |
+
+| 출력 | 내용 |
+|---|---|
+| `checks` | 적용된 확인 항목 (처리 방식, 자료 출처, 담당 포함) |
+| `policy` | `policyCheck` 입력용 필수 서류 정책 |
+| `online`, `onsite` | 온라인 제출·자동 확보 항목, 현장 확인 항목 |
+| `approver` | 전결권자 |
+| `reasons` | 적용 조건 설명 |
 
 ## nextBestAction
 

@@ -335,9 +335,50 @@
       if (!d) return { ...req, status: "미제출" };
       return { ...req, status: d.status, doc: d };
     });
-    const missing = items.filter((i) => ["미제출", "요청됨"].includes(i.status));
+    // 제출만으로는 충족되지 않는다. 심사역 확인 완료 또는 자동 확보가 필요하다.
+    const missing = items.filter((i) => !["충족", "자동 확보", "해당 없음"].includes(i.status));
     const limit = policy.approvalLimits.find((l) => application.amount <= l.max);
     return { items, missing, complete: missing.length === 0, approver: limit ? limit.role : "본부 심사위원회" };
+  }
+
+  // ------------------------------------------------------------ 상품·기업 조건별 심사 절차 구성
+  // 온톨로지의 확인 항목·자료 출처·담당자·처리 방식과 상품별 필수 항목을 조합해 절차를 만든다.
+  // ctx: { productId, isProxy, companyType: 'listed'|'unlisted', amount }
+  function compileWorkflow(ctx, ontology) {
+    const product = ontology.products.find((p) => p.id === ctx.productId) || ontology.products[0];
+    const isProxy = !!ctx.isProxy;
+    const isListed = ctx.companyType !== "unlisted";
+    const checks = product.required.filter((id) => id !== "POA" || isProxy).map((id) => {
+      const def = ontology.checks[id];
+      const out = { id, code: id, ...def, why: def.why, policy: product.name };
+      if (id === "FS") {
+        out.channel = isListed ? "DART 자동 수집" : "고객 온라인 제출";
+        out.source = isListed ? "DART" : "고객 제출";
+        out.why = isListed ? "공시 재무정보 기반 상환능력 분석" : "공시 부족: 고객 제출 재무제표 검증";
+        if (isListed) out.autoSource = "DART 사업보고서 자동 확보 (공시 시점·범위 검증 필요)";
+      }
+      if (id === "POA") out.why = "대표이사 외 신청인의 위임 범위 확인";
+      return out;
+    });
+    const policy = {
+      product: product.name,
+      version: ontology.version,
+      required: checks.map((x) => ({
+        code: x.code, name: x.name, why: x.why,
+        ...(x.autoSource ? { autoSource: x.autoSource } : {}),
+      })),
+      approvalLimits: ontology.approvalLimits,
+    };
+    const onsite = checks.filter((x) => x.type === "onsite");
+    const online = checks.filter((x) => x.channel.includes("온라인") || x.channel.includes("DART"));
+    const reasons = [
+      `${product.name}: 상품별 확인 항목 ${product.required.length}개 중 ${checks.length}개 적용`,
+      isProxy ? "대리 신청: 위임장 확인 추가" : "대표자 신청: 위임장 확인 제외",
+      isListed ? "상장기업: 공시 재무정보 자동 수집·검증" : "비상장·공시 부족: 고객 재무자료 요청",
+      onsite.length ? `현장 확인 ${onsite.length}개: 온라인 처리 제외, 별도 담당자 배정` : "현장 확인 항목 없음",
+    ];
+    const limit = ontology.approvalLimits.find((x) => ctx.amount <= x.max);
+    return { product, checks, policy, reasons, onsite, online, approver: limit ? limit.role : "본부 심사위원회" };
   }
 
   // ------------------------------------------------------------ 다음 업무 추천 (정보가치)
@@ -480,6 +521,7 @@
   register("riskSignals", { version: "0.9.0", kind: "분석", desc: "설명용 위험 신호 규칙 (실제 PD 모형 아님)" }, riskSignals);
   register("simulateRepayment", { version: "1.0.0", kind: "시뮬레이션", desc: "대출 조건·매출·금리 시나리오별 상환여력" }, simulateRepayment);
   register("policyCheck", { version: "1.0.0", kind: "정책", desc: "필수 서류·승인권한 확인" }, policyCheck);
+  register("compileWorkflow", { version: "1.0.0", kind: "온톨로지", desc: "상품·신청인·기업정보 조건별 필수 확인 항목·담당자·처리 방식 구성" }, compileWorkflow);
   register("nextBestAction", { version: "1.0.0", kind: "의사결정", desc: "선택 확인의 정보가치와 비용 비교" }, nextBestAction);
   register("detectMonitoringEvents", { version: "1.0.0", kind: "모니터링", desc: "공시·사채 만기 사건을 대출과 연결" }, detectMonitoringEvents);
   register("checkCovenants", { version: "1.0.0", kind: "정책", desc: "약정 재무비율 점검" }, checkCovenants);

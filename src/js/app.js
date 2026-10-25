@@ -49,6 +49,51 @@
   // ------------------------------------------------------------ Action
   // 각 Action: 실행 가능한 역할, 사전조건, 실행 내용. 실패하면 이유를 돌려준다.
   const ACTIONS = {
+    CreateCaseFromWorkflow: {
+      label: "상품별 가상 심사 건 생성",
+      allowed: (u) => ["심사역", "심사팀장"].includes(u.role),
+      pre: (v) => {
+        if (!SEED.processOntology.products.some((x) => x.id === v.productId)) return "알 수 없는 상품입니다.";
+        if (v.companyType !== "listed") return "비상장기업은 재무 데이터가 없어 절차 구성만 시연합니다.";
+        if (![10, 30, 50].includes(v.amountEok)) return "시연용 대출 금액이 아닙니다.";
+        return null;
+      },
+      run: (v) => {
+        const prod = SEED.processOntology.products.find((x) => x.id === v.productId);
+        const co = company("00624518");
+        const c = {
+          id: `DEMO-2026-${String(S.seq++).padStart(4, "0")}`, kind: "new",
+          productId: prod.id, corp_code: co.corp_code, product: prod.name,
+          amount: v.amountEok * 1e8, rate: 6.8, years: 2, method: "bullet",
+          purpose: "상품·신청인 조건별 심사 절차 비교 (가상)",
+          submittedAt: ASOF, submitter: v.isProxy ? { name: "최민수", role: "재무팀장" } : { name: co.ceo, role: "대표이사" },
+          status: "심사 중", assignee: "u1", documents: [], requests: [], opinions: [], decision: null,
+          demoCase: true,
+        };
+        S.cases.push(c);
+        return `${c.id}: ${prod.name}, ${v.isProxy ? "대리 신청" : "대표자 신청"}, ${v.amountEok}억 원 가상 심사 건 생성`;
+      },
+    },
+    RecordSiteInspection: {
+      label: "현장 확인 결과 기록",
+      allowed: (u) => ["심사역", "심사팀장"].includes(u.role),
+      pre: (v) => {
+        const c = caseById(v.caseId);
+        if (!c || c.decision) return "진행 중인 신청 건이 없습니다.";
+        const wf = workflowFor(c);
+        if (!wf || !wf.onsite.some((x) => x.code === v.code)) return "해당 상품의 현장 확인 항목이 아닙니다.";
+        if (!v.note || v.note.trim().length < 6) return "현장 확인 근거를 6자 이상 입력해 주세요.";
+        return null;
+      },
+      run: (v) => {
+        const c = caseById(v.caseId);
+        const w = workflowFor(c).onsite.find((x) => x.code === v.code);
+        const doc = c.documents.find((x) => x.code === v.code);
+        const data = { code: v.code, name: w.name, status: "확인 완료", file: "현장 확인 기록 (가상)", note: v.note.trim(), reviewedBy: S.role };
+        if (doc) Object.assign(doc, data); else c.documents.push(data);
+        return `${c.id}: ${w.name} 확인 완료 (시연 기록)`;
+      },
+    },
     RequestDocument: {
       label: "자료 요청",
       allowed: (u) => ["심사역", "심사팀장"].includes(u.role),
@@ -74,6 +119,7 @@
         const c = caseById(p.caseId);
         const r = c && c.requests.find((x) => x.id === p.reqId);
         if (!r) return "요청 건이 없습니다.";
+        if (c.corp_code !== user().customerOf) return "다른 기업의 자료는 제출할 수 없습니다.";
         if (r.status !== "요청됨" && r.status !== "보완 요청") return "이미 제출했습니다.";
         if (!p.file) return "파일을 선택해 주세요.";
         return null;
@@ -87,6 +133,23 @@
           if (d) { d.status = "제출됨"; d.file = p.file; } else c.documents.push({ code: r.code, name: r.name, status: "제출됨", file: p.file });
         }
         return `${c.id}: '${r.name}' 제출 (${p.file})`;
+      },
+    },
+    ReviewUploadedDocument: {
+      label: "접수 서류 확인",
+      allowed: (u) => ["심사역", "심사팀장"].includes(u.role),
+      pre: (v) => {
+        const c = caseById(v.caseId);
+        const d = c && c.documents.find((x) => x.code === v.code);
+        if (!c || c.decision) return "진행 중인 심사 건이 아닙니다.";
+        if (!d || d.status !== "제출됨") return "검토 대기 중인 접수 서류가 없습니다.";
+        return null;
+      },
+      run: (v) => {
+        const c = caseById(v.caseId);
+        const d = c.documents.find((x) => x.code === v.code);
+        d.status = "확인 완료"; d.reviewedBy = S.role; d.reviewedAt = now();
+        return `${c.id}: ${d.name} 확인 완료`;
       },
     },
     ReviewDocument: {
@@ -217,14 +280,26 @@
     return `${+y + n}-${m}-${dd}`;
   }
 
+  function workflowFor(c) {
+    if (c.kind === "renewal") return null;
+    const co = company(c.corp_code);
+    const isProxy = C.call("checkAuthority", useCaseOf(c), co, c).needsPowerOfAttorney;
+    const productId = c.productId || (SEED.processOntology.products.find((p) => p.name === c.product) || SEED.processOntology.products[0]).id;
+    return C.call("compileWorkflow", useCaseOf(c), {
+      productId, isProxy, companyType: "listed", amount: c.amount,
+    }, SEED.processOntology);
+  }
+
   function policyFor(c) {
-    const pol = c.kind === "renewal" ? SEED.renewalPolicy : SEED.policy;
+    const workflow = workflowFor(c);
+    const pol = c.kind === "renewal" ? SEED.renewalPolicy : workflow.policy;
     const auth = c.kind === "new" ? C.call("checkAuthority", useCaseOf(c), company(c.corp_code), c) : null;
-    const docs = c.documents.map((d) => ({ ...d, status: d.status === "제출됨" || d.status === "확인 완료" ? "충족" : d.status }));
+    const docs = c.documents.map((d) => ({ ...d, status: d.status === "확인 완료" ? "충족" : d.status }));
     c.requests.forEach((r) => {
-      if (r.code && !docs.find((d) => d.code === r.code)) docs.push({ code: r.code, name: r.name, status: r.status });
+      if (r.code && !docs.find((d) => d.code === r.code)) docs.push({ code: r.code, name: r.name, status: r.status === "확인 완료" ? "충족" : r.status });
     });
-    return C.call("policyCheck", useCaseOf(c), c, docs, pol, auth);
+    const result = C.call("policyCheck", useCaseOf(c), c, docs, pol, auth);
+    return { ...result, workflow, policyVersion: pol.version };
   }
 
   const useCaseOf = (c) => (c.kind === "renewal" ? "만기연장 심사" : "신규 운전자금 심사");
@@ -285,18 +360,20 @@
 
   const NAV_STAFF = [
     ["@", "심사 업무"], ["home", "업무 현황"], ["company", "기업 정보"],
+    ["@", "절차 설계"], ["workflow", "상품별 심사 온톨로지"],
     ["@", "여신 관리"], ["loans", "실행 여신"], ["monitor", "사후 모니터링"],
     ["@", "운영"], ["packages", "업무 기능 관리"], ["audit", "처리 기록"],
   ];
   const NAV_CUSTOMER = [["@", "고객 서비스"], ["portal", "요청 자료 제출"]];
   const PAGE_LABEL = { home: "업무 현황", cases: "업무 현황", case: "업무 현황", company: "기업 정보", loans: "실행 여신", loan: "실행 여신",
-    monitor: "사후 모니터링", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
+    monitor: "사후 모니터링", workflow: "상품별 심사 온톨로지", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
   const ICON = {
     home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     company: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/><path d="M10 21v-3h4v3"/>',
     cases: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8.5 12l2 2 4-4"/><path d="M9 17h6"/>',
     loans: '<rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/>',
     monitor: '<path d="M3 12h4l2-6 4 12 2-6h6"/>',
+    workflow: '<circle cx="4" cy="12" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="20" cy="19" r="2"/><path d="M6 12h6l6-7M12 12l6 7"/>',
     packages: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><path d="M17 13v8M13 17h8"/>',
     audit: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     portal: '<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/>',
@@ -325,7 +402,7 @@
 
     const main = document.getElementById("main");
     const pages = { home: pageHome, company: pageCompany, cases: pageHome, case: pageCase, loans: pageLoans, loan: pageLoan,
-      monitor: pageMonitor, packages: pagePackages, audit: pageAudit, portal: pagePortal };
+      monitor: pageMonitor, workflow: pageWorkflow, packages: pagePackages, audit: pageAudit, portal: pagePortal };
     const crumb = r.page === "case" || r.page === "loan" || (r.page === "company" && r.id)
       ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.id || "")}</b>`
       : `<b>${PAGE_LABEL[r.page] || "업무 현황"}</b>`;
@@ -358,6 +435,7 @@
         <div class="kpi"><div class="k">미처리 공시 사건</div><div class="v">${evs.length}건</div></div>
         <div class="kpi"><div class="k">만기 60일 이내 여신</div><div class="v">${dueLoans.length}건</div></div>
       </div>
+      <section class="card workflow-intro"><div class="row-between"><div><h2>상품·기업 조건별 심사 절차</h2><p class="small">대출 상품·신청인·공시 여부에 따른 필수 확인 항목·담당자·처리 방식의 비교</p></div><a href="#/workflow" class="btn-ghost">절차 비교</a></div></section>
       <section class="card"><h2>심사 건</h2>${caseTable(mine)}</section>
       ${waiting.length ? `<section class="card"><h2>고객이 제출한 자료</h2><table class="t"><tr><th>신청 건</th><th>자료</th><th>파일</th><th>제출 시각</th><th></th></tr>
         ${waiting.map(({ c, r }) => `<tr><td><a href="#/case/${c.id}">${c.id}</a></td><td>${esc(r.name)}</td><td>${esc(r.file)}</td><td>${esc(r.submittedAt)}</td><td><a href="#/case/${c.id}">확인하러 가기</a></td></tr>`).join("")}</table></section>` : ""}
@@ -520,10 +598,17 @@
 
     // 2. 자료 확인
     const s2 = step(2, "자료 확인", c.kind === "new" ? ["policyCheck", "checkAuthority", "validateFacts"] : ["policyCheck", "validateFacts"], `
-      <h3>필수 자료 (${esc((c.kind === "renewal" ? SEED.renewalPolicy : SEED.policy).version)})</h3>
+      <h3>필수 자료·확인 업무 (${esc(pc.policyVersion)})</h3>
+      ${pc.workflow ? `<p class="note">적용 상품: <b>${esc(pc.workflow.product.name)}</b> · <a href="#/workflow">상품별 절차 비교</a></p>` : ""}
       <table class="t"><tr><th>자료</th><th>이유</th><th>상태</th><th></th></tr>
         ${pc.items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.why)}</td><td>${i.status === "충족" || i.status === "자동 확보" ? `<span class="st st-ok">${esc(i.status)}</span>` : i.status === "해당 없음" ? `<span class="muted">해당 없음</span>` : statusBadge(i.status)}${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}</td>
-          <td>${i.status === "미제출" ? `<button data-act="RequestDocument" data-code="${i.code}" data-name="${esc(i.name)}" data-reason="필수 자료">요청</button>` : ""}</td></tr>`).join("")}</table>
+          <td>${i.code === "SITE_REPORT" ? `<span class="muted">현장 확인 (은행 담당)</span>` : i.status === "제출됨" ? `<button data-act="ReviewUploadedDocument" data-code="${i.code}">확인 완료</button>` : i.status === "미제출" ? `<button data-act="RequestDocument" data-code="${i.code}" data-name="${esc(i.name)}" data-reason="필수 자료">요청</button>` : ""}</td></tr>`).join("")}</table>
+      ${pc.workflow && pc.workflow.onsite.length ? `<div class="onsite-note"><h3>현장 확인 (온라인 제출 대상 제외)</h3>
+        ${pc.workflow.onsite.map((x) => {
+          const done = c.documents.find((d) => d.code === x.code && d.status === "확인 완료");
+          return `<p><b>${esc(x.name)}</b> · ${done ? "확인 완료 (시연 기록)" : "확인 대기"}</p>
+            ${done ? `<p class="note">${esc(done.note || "")} / ${esc(userName(done.reviewedBy))}</p>` : `<form data-form="onsite" data-code="${x.code}" class="inline"><input name="note" required placeholder="현장 확인 근거"><button type="submit">확인 결과 기록</button></form>`}`;
+        }).join("")}</div>` : ""}
       ${auth ? `<h3>대표권 확인</h3>${findings(auth.findings)}` : ""}
       <h3>공시 자료 검증</h3>${findings(checks)}`);
 
@@ -645,7 +730,7 @@
       </aside>`;
     return `
       <div class="page-head keep"><div><h1>${c.id} <span class="h1-co">${esc(co.name)}</span></h1>
-        <p class="sub">${c.kind === "new" ? "신규 운전자금 심사" : "만기연장 심사"} · ${statusBadge(c.status)} · 접수 ${c.submittedAt}</p></div>
+        <p class="sub">${c.kind === "new" ? "신규 여신 심사" : "만기연장 심사"} · ${statusBadge(c.status)} · 접수 ${c.submittedAt}${c.demoCase ? " · 상품 비교용 가상 신청" : ""}</p></div>
         <div class="head-actions"><a class="btn-ghost" href="#/company/${co.corp_code}">기업 정보</a>${c.loanId ? `<a class="btn-ghost" href="#/loan/${c.loanId}">대출 정보</a>` : ""}</div></div>
       ${stepper}
       <div class="case-layout"><div class="case-main">
@@ -721,6 +806,50 @@
       <p class="note">중요도는 공시 분류별 규칙입니다 (차입·사채·보증·최대주주·소송: 검토, 관리종목·거래정지: 긴급, 그 외: 참고). 공시 외의 은행 내부 정보(연체, 거래 변화)는 PoC 범위에 없습니다.</p></section>`;
   }
 
+  // ------------------------------------------------------------ 상품별 심사 온톨로지
+  const workflowSelection = { productId: "working", applicant: "proxy", companyType: "listed", amountEok: 30 };
+
+  function pageWorkflow() {
+    const ont = SEED.processOntology;
+    const sel = workflowSelection;
+    const ctx = { productId: sel.productId, isProxy: sel.applicant === "proxy", companyType: sel.companyType, amount: sel.amountEok * 1e8 };
+    const wf = C.call("compileWorkflow", "상품별 심사 절차 미리보기", ctx, ont);
+    const compare = ont.products.map((p) => ({
+      p, wf: C.call("compileWorkflow", "상품별 비교", { ...ctx, productId: p.id }, ont),
+    }));
+    const columns = ["확인 항목", "확인 사유", "처리 방식·자료 출처", "담당"];
+    return `<h1>상품별 심사 온톨로지</h1>
+      <p class="sub">동일 시스템에서 상품·신청인·기업 조건에 따라 구성되는 심사 절차의 비교</p>
+      <section class="card"><h2>심사 조건</h2>
+        <form data-form="workflow" class="workflow-controls">
+          <label>대출 상품<select name="productId">${ont.products.map((p) => `<option value="${p.id}" ${sel.productId === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>
+          <label>신청인<select name="applicant"><option value="proxy" ${sel.applicant === "proxy" ? "selected" : ""}>대리 신청 (재무팀장)</option><option value="representative" ${sel.applicant === "representative" ? "selected" : ""}>대표이사 신청</option></select></label>
+          <label>기업 정보<select name="companyType"><option value="listed" ${sel.companyType === "listed" ? "selected" : ""}>상장기업 (DART 공시)</option><option value="unlisted" ${sel.companyType === "unlisted" ? "selected" : ""}>비상장·공시 부족</option></select></label>
+          <label>신청 금액<select name="amountEok">${[10, 30, 50].map((x) => `<option value="${x}" ${sel.amountEok === x ? "selected" : ""}>${x}억 원</option>`).join("")}</select></label>
+          <button type="submit">절차 구성</button>
+        </form>
+        <p class="note">${tag("SYN")} 상품별 확인 기준과 현장 확인 여부는 가상은행 내규이며 실제 은행 내규나 법적 기준이 아닙니다.</p>
+      </section>
+      <div class="grid3 workflow-summary">
+        <div class="kpi"><div class="k">필수 확인 항목</div><div class="v">${wf.checks.length}개</div></div>
+        <div class="kpi"><div class="k">온라인 제출·자동 확보</div><div class="v">${wf.online.length}개</div></div>
+        <div class="kpi"><div class="k">현장 확인</div><div class="v">${wf.onsite.length}개</div></div>
+      </div>
+      <section class="card"><div class="row-between"><h2>심사 절차: ${esc(wf.product.name)}</h2><span class="st st-sub">전결권자: ${esc(wf.approver)}</span></div>
+        <p>${esc(wf.product.note)}</p>
+        <div class="workflow-rules">${wf.reasons.map((x) => `<div>${esc(x)}</div>`).join("")}</div>
+        <table class="t"><tr>${columns.map((x) => `<th>${x}</th>`).join("")}</tr>
+          ${wf.checks.map((x) => `<tr class="${x.type === "onsite" ? "field-row" : ""}"><td><b>${esc(x.name)}</b></td><td>${esc(x.why)}</td><td>${esc(x.channel)}<div class="note">출처: ${esc(x.source)}</div></td><td>${esc(x.owner)}</td></tr>`).join("")}</table>
+        ${sel.companyType === "listed" ? `<button data-act="CreateCaseFromWorkflow" data-productid="${sel.productId}" data-applicant="${sel.applicant}" data-amount="${sel.amountEok}">이 조건으로 심사 건 생성</button>
+          <p class="note">다산솔루에타 공시 정보를 사용하는 가상 신청 건을 추가합니다. 기존 신청 건은 변경되지 않습니다.</p>` : `<p class="note warn-t">비상장기업은 재무 데이터가 없어 절차 구성만 시연합니다.</p>`}
+      </section>
+      <section class="card"><h2>상품별 비교</h2><p class="small">동일 기업·신청인 조건에서 공통 확인 항목은 유지되고 상품별 확인 항목만 추가됩니다.</p>
+        <div class="grid3">${compare.map(({ p, wf: w }) => `<div class="workflow-product ${p.id === sel.productId ? "selected" : ""}"><h3>${esc(p.name)}</h3><p class="small">필수 ${w.checks.length}개 · 현장 확인 ${w.onsite.length}개</p>
+          <ul class="plain small">${w.checks.map((x) => `<li>${esc(x.name)}${x.type === "onsite" ? " · 현장" : ""}</li>`).join("")}</ul></div>`).join("")}</div>
+      </section>
+      <p class="note">확인 항목과 상품별 규칙을 데이터로 정의하고 조건에 따라 절차를 구성하는 시연입니다. 실제 은행 시스템 연계와 법규 검증은 범위에 포함하지 않습니다.</p>`;
+  }
+
   // ------------------------------------------------------------ 업무 기능 관리 (패키지)
   function pagePackages() {
     return `<h1>업무 기능 관리</h1>
@@ -794,8 +923,14 @@
     keep();
     if (act === "RequestDocument") runAction(act, { caseId: r.id, code: t.dataset.code, name: t.dataset.name, detail: t.dataset.detail, reason: t.dataset.reason });
     else if (act === "ReviewDocument") runAction(act, { caseId: r.id, reqId: t.dataset.req, result: t.dataset.result });
+    else if (act === "ReviewUploadedDocument") runAction(act, { caseId: r.id, code: t.dataset.code });
     else if (act === "StartRenewalReview") runAction(act, { loanId: t.dataset.loan });
     else if (act === "CreateMonitoringTask") runAction(act, { key: t.dataset.key, title: t.dataset.title, loanId: t.dataset.loanid });
+    else if (act === "CreateCaseFromWorkflow") {
+      const before = S.cases.length;
+      const ok = runAction(act, { productId: t.dataset.productid, isProxy: t.dataset.applicant === "proxy", companyType: workflowSelection.companyType, amountEok: Number(t.dataset.amount) });
+      if (ok && S.cases.length > before) location.hash = "#/case/" + S.cases[S.cases.length - 1].id;
+    }
   });
 
   function keep() { window.__keepScroll = window.scrollY; }
@@ -807,7 +942,15 @@
     const r = route();
     const fd = new FormData(f);
     keep();
-    if (f.dataset.form === "scenario") {
+    if (f.dataset.form === "workflow") {
+      workflowSelection.productId = String(fd.get("productId") || "working");
+      workflowSelection.applicant = String(fd.get("applicant") || "proxy");
+      workflowSelection.companyType = String(fd.get("companyType") || "listed");
+      workflowSelection.amountEok = Number(fd.get("amountEok") || 30);
+      window.__keepScroll = 0; render(); toast("심사 절차를 다시 구성했습니다");
+    } else if (f.dataset.form === "onsite") {
+      runAction("RecordSiteInspection", { caseId: r.id, code: f.dataset.code, note: String(fd.get("note") || "") });
+    } else if (f.dataset.form === "scenario") {
       const n = (k) => parseFloat(fd.get(k));
       const sp0 = scenarioParams(caseById(f.dataset.case));
       S.scenario[f.dataset.case] = {

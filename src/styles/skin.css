@@ -179,3 +179,26 @@ summary { font-size: 12.5px; }
 .seg button.on:hover { background: var(--yellow); }
 .btn-text:hover { background: none; border-color: transparent; }
 nav::-webkit-scrollbar { height: 0; }
+
+/* 상품/기업 조건별 심사 온톨로지 시연 */
+.workflow-intro { background: #FFFCF5; border-color: #EAD9B3; }
+.workflow-intro h2 { margin-bottom: 4px; }
+.workflow-intro p { margin: 0; }
+.workflow-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.workflow-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; min-width: 170px; flex: 1 1 175px; }
+.workflow-controls select { height: 35px; width: 100%; }
+.workflow-controls button { height: 35px; }
+.workflow-summary { margin-bottom: 12px; }
+.workflow-summary .kpi { border: 1px solid var(--line); border-radius: 4px; }
+.workflow-rules { margin: 13px 0; background: #F8F6F1; border: 1px solid var(--line); border-radius: 4px; padding: 10px 13px; }
+.workflow-rules div { padding: 4px 0; }
+.workflow-rules div::before { content: '✓'; margin-right: 9px; color: #5A3A1E; font-weight: 700; }
+.workflow-product { border: 1px solid var(--line); border-radius: 4px; padding: 13px; }
+.workflow-product.selected { background: #FBF3DC; border-color: #E5D3A2; }
+.workflow-product h3 { margin: 0 0 8px; }
+.workflow-product li { margin-bottom: 5px; }
+.field-row { background: #FFF5EB; }
+.onsite-note { background: #FFF5EB; border: 1px solid #EEDCC7; padding: 12px; margin-top: 12px; border-radius: 4px; }
+.onsite-note h3 { margin-top: 0; }
+@media(max-width:900px) { .workflow-summary { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .workflow-summary { grid-template-columns: 1fr; } .workflow-controls label { flex-basis:100%; } }
