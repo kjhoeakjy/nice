@@ -63,7 +63,7 @@
 | `asOf` | 분석 기준일 `2026-10-13` |
 | `bank` | 은행명 `가상은행` |
 | `users` | 심사역 `u1`, 심사팀장 `u2` (전결 한도 30억 원), 고객 `c1` (다산솔루에타 재무팀장) |
-| `processOntology` | 상품별 심사 절차 온톨로지: 확인 항목(`checks`), 상품별 필수 항목(`products`), 전결 권한 한도 |
+| `processOntology` | 심사 온톨로지: 심사 업무(`tasks`), 자료(`documents`), 상품별 업무 조합(`products`), 전결 권한 한도 |
 | `renewalPolicy` | 만기연장 필수 서류, 전결 권한 한도 |
 | `eviAssumptions` | 정보가치 계산 가정값 (손실률, 정상 기업 거절 손실률, 추가 확인 항목별 민감도·특이도·비용) |
 | `scenarioDefaults` | 상환여력 시나리오 기본값 |

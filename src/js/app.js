@@ -359,14 +359,13 @@
   }
 
   const NAV_STAFF = [
-    ["@", "심사 업무"], ["home", "업무 현황"], ["company", "기업 정보"],
-    ["@", "절차 설계"], ["workflow", "상품별 심사 온톨로지"],
+    ["@", "심사 업무"], ["home", "업무 현황"], ["workflow", "심사 온톨로지"], ["company", "기업 정보"],
     ["@", "여신 관리"], ["loans", "실행 여신"], ["monitor", "사후 모니터링"],
     ["@", "운영"], ["packages", "업무 기능 관리"], ["audit", "처리 기록"],
   ];
   const NAV_CUSTOMER = [["@", "고객 서비스"], ["portal", "요청 자료 제출"]];
   const PAGE_LABEL = { home: "업무 현황", cases: "업무 현황", case: "업무 현황", company: "기업 정보", loans: "실행 여신", loan: "실행 여신",
-    monitor: "사후 모니터링", workflow: "상품별 심사 온톨로지", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
+    monitor: "사후 모니터링", workflow: "심사 온톨로지", packages: "업무 기능 관리", audit: "처리 기록", portal: "요청 자료 제출" };
   const ICON = {
     home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
     company: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/><path d="M10 21v-3h4v3"/>',
@@ -415,7 +414,9 @@
       tb.querySelectorAll("tr").forEach((tr, i) => { if (i === 0) return; Array.from(tr.children).forEach((td, j) => { if (ths[j]) td.setAttribute("data-th", ths[j]); }); });
     });
     main.querySelectorAll("[data-init]").forEach((el) => INIT[el.dataset.init] && INIT[el.dataset.init](el));
-    window.scrollTo(0, window.__keepScroll || 0);
+    const anchor = r.page === "case" && { evi: "step-5" }[r.sub];
+    if (anchor && !window.__keepScroll && document.getElementById(anchor)) document.getElementById(anchor).scrollIntoView();
+    else window.scrollTo(0, window.__keepScroll || 0);
     window.__keepScroll = 0;
   }
 
@@ -435,7 +436,12 @@
         <div class="kpi"><div class="k">미처리 공시 사건</div><div class="v">${evs.length}건</div></div>
         <div class="kpi"><div class="k">만기 60일 이내 여신</div><div class="v">${dueLoans.length}건</div></div>
       </div>
-      <section class="card workflow-intro"><div class="row-between"><div><h2>상품·기업 조건별 심사 절차</h2><p class="small">대출 상품·신청인·공시 여부에 따른 필수 확인 항목·담당자·처리 방식의 비교</p></div><a href="#/workflow" class="btn-ghost">절차 비교</a></div></section>
+      <section class="card workflow-intro"><h2>시연 구성</h2>
+        <div class="guide">
+          <a href="#/workflow"><b>심사 온톨로지</b><span>심사 업무별 필요 자료·담당·판단 기준·전결권자의 연결과 상품·기업 조건별 절차 구성</span></a>
+          <a href="#/case/APP-2026-0412"><b>온톨로지 기반 심사</b><span>신청 정보 확인, 추가 자료 요청, 재무지표 산출, 상환능력 분석, 승인 요청</span></a>
+          <a href="#/case/APP-2026-0412/evi"><b>정보가치 기반 추가 확인 항목 선택</b><span>기대손실 감소와 확인 비용의 비교에 따른 추가 자료 선택</span></a>
+        </div></section>
       <section class="card"><h2>심사 건</h2>${caseTable(mine)}</section>
       ${waiting.length ? `<section class="card"><h2>고객이 제출한 자료</h2><table class="t"><tr><th>신청 건</th><th>자료</th><th>파일</th><th>제출 시각</th><th></th></tr>
         ${waiting.map(({ c, r }) => `<tr><td><a href="#/case/${c.id}">${c.id}</a></td><td>${esc(r.name)}</td><td>${esc(r.file)}</td><td>${esc(r.submittedAt)}</td><td><a href="#/case/${c.id}">확인하러 가기</a></td></tr>`).join("")}</table></section>` : ""}
@@ -581,7 +587,7 @@
     const findings = (list) => `<ul class="checks">${list.map((f) => `<li>${levelBadge(f.level)}<div><b>${esc(f.title)}</b><p>${esc(f.detail)} ${(f.refs || []).map((x) => dartLink(x.rcept_no, x.label)).join(" ")}</p></div></li>`).join("")}</ul>`;
 
     // 1. 신청 / 대출 현황
-    const s1 = c.kind === "new" ? step(1, "신청 내용", [], `
+    const s1 = c.kind === "new" ? step(1, "신청 정보 확인", [], `
         <dl class="dl cols">
           <dt>기업</dt><dd><a href="#/company/${co.corp_code}">${esc(co.name)}</a></dd><dt>상품</dt><dd>${esc(c.product)}</dd>
           <dt>신청 금액</dt><dd>${fmt(c.amount)}</dd><dt>기간·상환</dt><dd>${c.years}년 · ${c.method === "bullet" ? "만기일시상환" : "원금균등분할"}</dd>
@@ -597,9 +603,17 @@
         <p class="note">${tag("SYN")} 대출·상환·약정 정보는 가상 데이터, 재무비율은 DART 공시로 계산했습니다.</p>`);
 
     // 2. 자료 확인
-    const s2 = step(2, "자료 확인", c.kind === "new" ? ["policyCheck", "checkAuthority", "validateFacts"] : ["policyCheck", "validateFacts"], `
-      <h3>필수 자료·확인 업무 (${esc(pc.policyVersion)})</h3>
-      ${pc.workflow ? `<p class="note">적용 상품: <b>${esc(pc.workflow.product.name)}</b> · <a href="#/workflow">상품별 절차 비교</a></p>` : ""}
+    const s2 = step(2, c.kind === "new" ? "심사 절차·필요 자료 확인" : "필요 자료 확인", c.kind === "new" ? ["policyCheck", "checkAuthority", "validateFacts"] : ["policyCheck", "validateFacts"], `
+      ${pc.workflow ? `<h3>심사 온톨로지 적용 절차: ${esc(pc.workflow.product.name)}</h3>
+      <table class="t"><tr><th>심사 업무</th><th>담당</th><th>판단 기준</th><th>상태</th></tr>
+        ${pc.workflow.tasks.map((t) => {
+          const st = t.docs.map((d) => (pc.items.find((i) => i.code === d.code) || {}).status);
+          const ok = st.filter((x) => ["충족", "자동 확보", "해당 없음"].includes(x)).length;
+          return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.owner)}</td><td class="small">${esc(t.criteria)}</td>
+            <td>${!t.docs.length ? `<span class="muted">시스템 산출</span>` : ok === t.docs.length ? `<span class="st st-ok">자료 충족</span>` : `<span class="st st-wait">자료 ${ok}/${t.docs.length}</span>`}</td></tr>`;
+        }).join("")}</table>
+      <p class="note">${esc(pc.policyVersion)} · 전결권자 ${esc(pc.workflow.approver)} · <a href="#/workflow">심사 온톨로지</a></p>` : ""}
+      <h3>필요 자료</h3>
       <table class="t"><tr><th>자료</th><th>이유</th><th>상태</th><th></th></tr>
         ${pc.items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.why)}</td><td>${i.status === "충족" || i.status === "자동 확보" ? `<span class="st st-ok">${esc(i.status)}</span>` : i.status === "해당 없음" ? `<span class="muted">해당 없음</span>` : statusBadge(i.status)}${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}</td>
           <td>${i.code === "SITE_REPORT" ? `<span class="muted">현장 확인 (은행 담당)</span>` : i.status === "제출됨" ? `<button data-act="ReviewUploadedDocument" data-code="${i.code}">확인 완료</button>` : i.status === "미제출" ? `<button data-act="RequestDocument" data-code="${i.code}" data-name="${esc(i.name)}" data-reason="필수 자료">요청</button>` : ""}</td></tr>`).join("")}</table>
@@ -614,7 +628,7 @@
 
     // 3. 재무 분석
     const row = (label, a, b, f) => `<tr><td>${label}</td><td>${f(b)}</td><td>${f(a)}</td></tr>`;
-    const s3 = step(3, c.kind === "new" ? "재무 분석" : "재무 변화", ["calcRatios", "summarizeDebt", "riskSignals"], `
+    const s3 = step(3, c.kind === "new" ? "재무지표 산출" : "재무 변화", ["calcRatios", "summarizeDebt", "riskSignals"], `
       <div class="grid2"><div>
         <table class="t num"><tr><th>지표 (별도)</th><th>${+y - 1}</th><th>${y}</th></tr>
           ${row("매출액", C.val(co, "OFS", y, "revenue"), C.val(co, "OFS", String(+y - 1), "revenue"), fmt)}
@@ -630,7 +644,7 @@
           <p class="note">${esc(risk.note)}</p></div></div>`);
 
     // 4. 상환여력
-    const s4 = step(4, "상환여력 시나리오", ["simulateRepayment"], `
+    const s4 = step(4, "상환능력 분석", ["simulateRepayment"], `
       <form class="params" data-form="scenario" data-case="${c.id}">
         <label>대출금(억)<input name="amount" type="number" step="1" value="${sp.amount / 1e8}"></label>
         <label>금리(%)<input name="rate" type="number" step="0.1" value="${sp.rate}"></label>
@@ -653,17 +667,15 @@
 
     // 5. 다음 업무 추천
     const requested = (name) => c.requests.some((x) => x.name === name);
-    const s5 = step(5, "추가 확인 추천", ["nextBestAction"], `
-      <p>필수 자료는 위 2단계에서 정책대로 모두 받습니다. 여기서는 <b>선택적으로 할 수 있는 확인</b>을 비교합니다.
-        추가 확인으로 판단이 바뀔 가능성이 크고 비용이 작은 것부터 추천합니다.</p>
-      <p>지금 정보만으로 결정하면 <b>${nba.now.choice}</b> 쪽의 예상 손실이 작습니다 (승인 ${fmt(nba.now.approve, 2)} / 거절 ${fmt(nba.now.reject, 2)}).
-        추천 항목은 결과에 따라 이 판단이 바뀔 수 있는 확인입니다.</p>
-      <table class="t num"><tr><th class="l">확인 항목</th><th>예상 효과</th><th>비용</th><th>효과 − 비용</th><th>추천</th><th></th></tr>
+    const s5 = step(5, "추가 확인 항목 선택", ["nextBestAction"], `
+      <p>필요 자료는 심사 절차에 따라 모두 확보하며, 선택 확인 항목은 순정보가치(기대손실 감소 − 확인 비용)가 큰 항목부터 요청합니다.</p>
+      <p class="small">현재 정보 기준 결정: <b>${nba.now.choice}</b> (기대손실 승인 ${fmt(nba.now.approve, 2)} · 거절 ${fmt(nba.now.reject, 2)})</p>
+      <table class="t num"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th>판단</th><th></th></tr>
         ${nba.ranked.map((a) => `<tr><td class="l"><b>${esc(a.name)}</b><div class="note">${esc(a.detail)}</div></td><td>${fmt(a.evi, 2)}</td><td>${fmt(a.cost, 2)}</td>
-          <td class="${a.net > 0 ? "ok-t" : "muted"}">${fmt(a.net, 2)}</td><td>${a.recommend ? "<b>추천</b>" : "보류"}</td>
-          <td>${requested(a.name) ? '<span class="muted">요청함</span>' : `<button data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="${a.recommend ? "추가 확인 추천" : "심사역 판단"}" class="${a.recommend ? "" : "ghost"}">요청</button>`}</td></tr>`).join("")}</table>
-      <h3>요청 방식 비교 (같은 가정에서 계산)</h3>
-      <table class="t num"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>예상 오판 손실</th><th>합계</th></tr>
+          <td class="${a.net > 0 ? "ok-t" : "muted"}">${fmt(a.net, 2)}</td><td>${a.recommend ? "<b>권고</b>" : "보류"}</td>
+          <td>${requested(a.name) ? '<span class="muted">요청함</span>' : `<button data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="${a.recommend ? "순정보가치 양수" : "심사역 판단"}" class="${a.recommend ? "" : "ghost"}">요청</button>`}</td></tr>`).join("")}</table>
+      <h3>요청 방식 비교 (동일 가정)</h3>
+      <table class="t num"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
         ${nba.compare.map((x, i) => `<tr class="${i === 2 ? "hlrow" : ""}"><td class="l">${esc(x.name)}</td><td>${x.count.toFixed(2)}</td><td>${fmt(x.cost, 2)}</td><td>${fmt(x.loss, 2)}</td><td><b>${fmt(x.cost + x.loss, 2)}</b></td></tr>`).join("")}</table>
       <details><summary>계산 방법</summary>
         <p class="small">현재 상환곤란 확률 p = ${pct(nba.prior, 0)} (3단계 위험 신호 구간). 승인했는데 상환곤란이면 손실 = 대출금 × ${ev.lgd * 100}% = ${fmt(loss.approveBad)},
@@ -675,7 +687,7 @@
 
     // 6. 요청 자료와 처리
     const canDecide = u.canApprove > 0;
-    const s6 = step(6, "요청 자료와 결정", [], `
+    const s6 = step(6, "추가 자료 요청·승인", [], `
       ${c.requests.length ? `<table class="t"><tr><th>번호</th><th>자료</th><th>사유</th><th>요청</th><th>상태</th><th>파일</th><th></th></tr>
         ${c.requests.map((q) => `<tr><td>${q.id}</td><td>${esc(q.name)}</td><td>${esc(q.reason)}</td><td>${esc(q.requestedAt)}</td><td>${statusBadge(q.status)}</td><td>${esc(q.file || "-")}</td>
           <td>${q.status === "제출됨" ? `<button data-act="ReviewDocument" data-req="${q.id}" data-result="확인 완료">확인 완료</button> <button class="ghost" data-act="ReviewDocument" data-req="${q.id}" data-result="보완 요청">보완 요청</button>` : ""}</td></tr>`).join("")}</table>
@@ -723,7 +735,7 @@
             <div><small>최소 DSCR</small><b class="${base.minDscr < 1 ? "warn-t" : ""}">${isFinite(base.minDscr) ? base.minDscr.toFixed(2) : "-"}</b><span>기본 시나리오</span></div>
             <div><small>확인 필요</small><b>${checks.filter((f) => f.level === "확인 필요").length}</b><span>공시 검증</span></div>
           </div>
-          ${top ? `<div class="side-reco"><small>추천 확인</small><b>${esc(top.name)}</b><span>효과 ${fmt(top.evi, 2)} · 비용 ${fmt(top.cost, 2)}</span></div>` : ""}
+          ${top ? `<div class="side-reco"><small>요청 항목 (순정보가치 기준)</small><b>${esc(top.name)}</b><span>순정보가치 ${fmt(top.net, 2)}</span></div>` : ""}
         </div>
         <div class="card side-card"><h3>최근 처리</h3>${recent.length ? `<ul class="side-log">${recent.map((a) => `<li><b>${esc(a.label)}</b><span>${esc(userName(a.by))}</span><small>${a.at.slice(11)}</small></li>`).join("")}</ul>` : `<p class="empty">아직 처리 기록이 없습니다.</p>`}</div>
         <a href="#/packages" class="side-pkg">${icon("packages")}<span>${uc}에 쓰인 공통 기능</span></a>
@@ -806,48 +818,79 @@
       <p class="note">중요도는 공시 분류별 규칙입니다 (차입·사채·보증·최대주주·소송: 검토, 관리종목·거래정지: 긴급, 그 외: 참고). 공시 외의 은행 내부 정보(연체, 거래 변화)는 PoC 범위에 없습니다.</p></section>`;
   }
 
-  // ------------------------------------------------------------ 상품별 심사 온톨로지
-  const workflowSelection = { productId: "working", applicant: "proxy", companyType: "listed", amountEok: 30 };
+  // ------------------------------------------------------------ 심사 온톨로지
+  const workflowSelection = { productId: "working", applicant: "proxy", companyType: "listed", amountEok: 30, taskId: "AUTH" };
+  const FN_LABEL = {
+    checkAuthority: "대표권 확인", validateFacts: "공시 자료 검증", calcRatios: "재무비율 산출", summarizeDebt: "차입금 집계",
+    simulateRepayment: "상환여력 시나리오", riskSignals: "위험 신호", nextBestAction: "정보가치 계산",
+  };
+
+  function ontologyHub(task, wf) {
+    const list = (arr) => arr.length ? `<ul>${arr.join("")}</ul>` : `<p class="muted">없음</p>`;
+    const node = (side, label, body) => `<div class="onto-node ${side}"><small>${label}</small>${body}</div>`;
+    const docs = list(task.docs.filter((d) => !task.extra.some((x) => x.doc.code === d.code))
+      .map((d) => `<li><b>${esc(d.name)}</b><span>${esc(d.channel)}</span></li>`)
+      .concat(task.refs.map((x) => `<li><b>${esc(x)}</b><span>자동 조회</span></li>`)));
+    const extra = list(task.extra.map((x) => `<li><b>${esc(x.doc.name)}</b><span>${esc(x.text)} · ${x.applied ? "현재 조건 적용" : "현재 조건 미적용"}</span></li>`));
+    const fns = list(task.fns.map((f) => `<li><b>${esc(FN_LABEL[f] || f)}</b></li>`));
+    return `<div class="onto-hub">
+      ${node("l1", "필요 자료·제출 방식", docs)}
+      ${node("l2", "추가 요청 자료", extra)}
+      ${node("l3", "처리·심사 담당", `<p><b>${esc(task.owner)}</b></p>`)}
+      <div class="onto-center"><small>심사 업무</small><b>${esc(task.name)}</b><span>${esc(wf.product.name)}</span></div>
+      ${node("r1", "판단 기준", `<p>${esc(task.criteria)}</p>`)}
+      ${node("r2", "시스템 지원 기능", fns)}
+      ${node("r3", "최종 승인", `<p><b>${esc(task.approver)}</b></p><span class="muted small">신청 금액 기준 전결권자</span>`)}
+    </div>`;
+  }
 
   function pageWorkflow() {
     const ont = SEED.processOntology;
     const sel = workflowSelection;
     const ctx = { productId: sel.productId, isProxy: sel.applicant === "proxy", companyType: sel.companyType, amount: sel.amountEok * 1e8 };
-    const wf = C.call("compileWorkflow", "상품별 심사 절차 미리보기", ctx, ont);
-    const compare = ont.products.map((p) => ({
-      p, wf: C.call("compileWorkflow", "상품별 비교", { ...ctx, productId: p.id }, ont),
-    }));
-    const columns = ["확인 항목", "확인 사유", "처리 방식·자료 출처", "담당"];
-    return `<h1>상품별 심사 온톨로지</h1>
-      <p class="sub">동일 시스템에서 상품·신청인·기업 조건에 따라 구성되는 심사 절차의 비교</p>
+    const wf = C.call("compileWorkflow", "심사 온톨로지", ctx, ont);
+    const task = wf.tasks.find((t) => t.id === sel.taskId) || wf.tasks[0];
+    const compare = ont.products.map((p) => ({ p, wf: C.call("compileWorkflow", "심사 온톨로지", { ...ctx, productId: p.id }, ont) }));
+    const opt = (v, cur, label) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${label}</option>`;
+    return `<h1>심사 온톨로지</h1>
+      <p class="sub">심사 업무별 필요 자료·제출 방식·담당·판단 기준·전결권자의 연결 구조와 조건별 심사 절차 구성</p>
       <section class="card"><h2>심사 조건</h2>
         <form data-form="workflow" class="workflow-controls">
-          <label>대출 상품<select name="productId">${ont.products.map((p) => `<option value="${p.id}" ${sel.productId === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></label>
-          <label>신청인<select name="applicant"><option value="proxy" ${sel.applicant === "proxy" ? "selected" : ""}>대리 신청 (재무팀장)</option><option value="representative" ${sel.applicant === "representative" ? "selected" : ""}>대표이사 신청</option></select></label>
-          <label>기업 정보<select name="companyType"><option value="listed" ${sel.companyType === "listed" ? "selected" : ""}>상장기업 (DART 공시)</option><option value="unlisted" ${sel.companyType === "unlisted" ? "selected" : ""}>비상장·공시 부족</option></select></label>
-          <label>신청 금액<select name="amountEok">${[10, 30, 50].map((x) => `<option value="${x}" ${sel.amountEok === x ? "selected" : ""}>${x}억 원</option>`).join("")}</select></label>
+          <label>대출 상품<select name="productId">${ont.products.map((p) => opt(p.id, sel.productId, esc(p.name))).join("")}</select></label>
+          <label>신청인<select name="applicant">${opt("proxy", sel.applicant, "대리 신청 (재무팀장)")}${opt("representative", sel.applicant, "대표이사 신청")}</select></label>
+          <label>기업 정보<select name="companyType">${opt("listed", sel.companyType, "상장기업 (DART 공시)")}${opt("unlisted", sel.companyType, "비상장·공시 부족")}</select></label>
+          <label>신청 금액<select name="amountEok">${[10, 30, 50].map((x) => opt(x, sel.amountEok, x + "억 원")).join("")}</select></label>
           <button type="submit">절차 구성</button>
         </form>
-        <p class="note">${tag("SYN")} 상품별 확인 기준과 현장 확인 여부는 가상은행 내규이며 실제 은행 내규나 법적 기준이 아닙니다.</p>
+        <p class="note">${tag("SYN")} 심사 업무·판단 기준·현장 확인 여부는 가상은행 내규이며 실제 은행 내규나 법적 기준이 아닙니다.</p>
       </section>
-      <div class="grid3 workflow-summary">
-        <div class="kpi"><div class="k">필수 확인 항목</div><div class="v">${wf.checks.length}개</div></div>
-        <div class="kpi"><div class="k">온라인 제출·자동 확보</div><div class="v">${wf.online.length}개</div></div>
+      <section class="card"><h2>심사 업무 구성: ${esc(task.name)}</h2>
+        <div class="seg wrap">${wf.tasks.map((t) => `<button type="button" data-otask="${t.id}" class="${t.id === task.id ? "on" : ""}">${esc(t.name)}</button>`).join("")}</div>
+        ${ontologyHub(task, wf)}
+        <p class="note">기업·상품이 달라져도 각 심사 업무는 동일한 구조로 정의되며 조건에 따라 추가 요청 자료와 전결권자가 달라집니다.</p>
+      </section>
+      <div class="grid4">
+        <div class="kpi"><div class="k">심사 업무</div><div class="v">${wf.tasks.length}개</div></div>
+        <div class="kpi"><div class="k">필요 자료</div><div class="v">${wf.checks.length}개</div></div>
         <div class="kpi"><div class="k">현장 확인</div><div class="v">${wf.onsite.length}개</div></div>
+        <div class="kpi"><div class="k">전결권자</div><div class="v small">${esc(wf.approver)}</div></div>
       </div>
-      <section class="card"><div class="row-between"><h2>심사 절차: ${esc(wf.product.name)}</h2><span class="st st-sub">전결권자: ${esc(wf.approver)}</span></div>
-        <p>${esc(wf.product.note)}</p>
+      <section class="card"><h2>심사 절차: ${esc(wf.product.name)}</h2>
         <div class="workflow-rules">${wf.reasons.map((x) => `<div>${esc(x)}</div>`).join("")}</div>
-        <table class="t"><tr>${columns.map((x) => `<th>${x}</th>`).join("")}</tr>
-          ${wf.checks.map((x) => `<tr class="${x.type === "onsite" ? "field-row" : ""}"><td><b>${esc(x.name)}</b></td><td>${esc(x.why)}</td><td>${esc(x.channel)}<div class="note">출처: ${esc(x.source)}</div></td><td>${esc(x.owner)}</td></tr>`).join("")}</table>
-        ${sel.companyType === "listed" ? `<button data-act="CreateCaseFromWorkflow" data-productid="${sel.productId}" data-applicant="${sel.applicant}" data-amount="${sel.amountEok}">이 조건으로 심사 건 생성</button>
-          <p class="note">다산솔루에타 공시 정보를 사용하는 가상 신청 건을 추가합니다. 기존 신청 건은 변경되지 않습니다.</p>` : `<p class="note warn-t">비상장기업은 재무 데이터가 없어 절차 구성만 시연합니다.</p>`}
+        <table class="t"><tr><th>심사 업무</th><th>필요 자료·제출 방식</th><th>담당</th><th>판단 기준</th></tr>
+          ${wf.tasks.map((t) => `<tr class="${t.docs.some((d) => d.type === "onsite") ? "field-row" : ""}"><td><b>${esc(t.name)}</b></td>
+            <td>${t.docs.length ? t.docs.map((d) => `${esc(d.name)}<div class="note">${esc(d.channel)}</div>`).join("") : `<span class="muted">시스템 산출</span>`}</td>
+            <td>${esc(t.owner)}</td><td class="small">${esc(t.criteria)}</td></tr>`).join("")}</table>
+        ${sel.companyType === "listed" ? `<div class="btns"><button data-act="CreateCaseFromWorkflow" data-productid="${sel.productId}" data-applicant="${sel.applicant}" data-amount="${sel.amountEok}">이 조건으로 심사 건 생성</button></div>
+          <p class="note">다산솔루에타 공시 정보를 사용하는 가상 신청 건을 추가하고 심사 화면으로 이동합니다. 기존 신청 건은 변경되지 않습니다.</p>`
+          : `<p class="note warn-t">비상장기업은 재무 데이터가 없어 절차 구성만 시연합니다.</p>`}
       </section>
-      <section class="card"><h2>상품별 비교</h2><p class="small">동일 기업·신청인 조건에서 공통 확인 항목은 유지되고 상품별 확인 항목만 추가됩니다.</p>
-        <div class="grid3">${compare.map(({ p, wf: w }) => `<div class="workflow-product ${p.id === sel.productId ? "selected" : ""}"><h3>${esc(p.name)}</h3><p class="small">필수 ${w.checks.length}개 · 현장 확인 ${w.onsite.length}개</p>
-          <ul class="plain small">${w.checks.map((x) => `<li>${esc(x.name)}${x.type === "onsite" ? " · 현장" : ""}</li>`).join("")}</ul></div>`).join("")}</div>
+      <section class="card"><h2>상품별 비교</h2><p class="small">동일 기업·신청인 조건에서 공통 심사 업무는 유지되고 상품별 업무만 추가됩니다.</p>
+        <div class="grid3">${compare.map(({ p, wf: w }) => `<div class="workflow-product ${p.id === sel.productId ? "selected" : ""}"><h3>${esc(p.name)}</h3>
+          <p class="small">업무 ${w.tasks.length}개 · 자료 ${w.checks.length}개 · 현장 확인 ${w.onsite.length}개</p>
+          <ul class="plain small">${w.tasks.map((t) => `<li><b>${esc(t.name)}</b>${t.docs.length ? `<div class="muted">${t.docs.map((d) => esc(d.name)).join(", ")}</div>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
       </section>
-      <p class="note">확인 항목과 상품별 규칙을 데이터로 정의하고 조건에 따라 절차를 구성하는 시연입니다. 실제 은행 시스템 연계와 법규 검증은 범위에 포함하지 않습니다.</p>`;
+      <p class="note">심사 업무와 상품별 규칙을 데이터로 정의하고 조건에 따라 절차를 구성하는 시연입니다. 실제 은행 시스템 연계와 법규 검증은 범위에 포함하지 않습니다.</p>`;
   }
 
   // ------------------------------------------------------------ 업무 기능 관리 (패키지)
@@ -912,12 +955,13 @@
   // ------------------------------------------------------------ 이벤트
   const INIT = {};
   document.addEventListener("click", (e) => {
-    const t = e.target.closest("button, [data-tab], [data-scope], [data-disc]");
+    const t = e.target.closest("button, [data-tab], [data-scope], [data-disc], [data-otask]");
     if (!t) return;
     const r = route();
     if (t.dataset.tab) { companyTab = t.dataset.tab; render(); return; }
     if (t.dataset.scope) { fsScope = t.dataset.scope; render(); return; }
     if (t.dataset.disc) { discFilter = t.dataset.disc; render(); return; }
+    if (t.dataset.otask) { workflowSelection.taskId = t.dataset.otask; keep(); render(); return; }
     const act = t.dataset.act;
     if (!act) return;
     keep();

@@ -23,26 +23,75 @@ window.CREDITOS_SEED = {
     ],
   },
 
-  // 상품별 심사 절차 온톨로지. 공통 확인 항목(checks)과 상품별 필수 항목(products.required)을 분리한다.
+  // 심사 온톨로지. 심사 업무(tasks)에 필요 자료·추가 요청 조건·담당·판단 기준·지원 기능을 연결하고,
+  // 상품(products)은 업무의 조합으로 정의한다. 전결권자는 신청 금액으로 정한다.
   // 가상은행의 시연용 내규이며 실제 은행 내규나 법적 기준이 아니다.
   processOntology: {
     version: "시연 내규 2026-10 (가상)",
-    checks: {
-      REG: { name: "법인등기사항전부증명서", why: "법인 실재·현재 대표이사 확인", channel: "온라인 제출", owner: "심사역", type: "document", source: "고객" },
-      SEAL: { name: "법인인감증명서", why: "약정·위임 서류의 인감 대조", channel: "온라인 제출", owner: "심사역", type: "document", source: "고객" },
-      POA: { name: "대표이사 위임장", why: "대리 신청 시 위임 범위 확인", channel: "온라인 제출", owner: "심사역", type: "document", source: "고객", condition: "proxy" },
-      FS: { name: "최근 3년 재무제표", why: "상환능력 분석·출처 검증", channel: "자동 수집 또는 온라인 제출", owner: "심사역", type: "document", source: "DART/고객", condition: "listed" },
-      USE: { name: "자금 사용 계획서", why: "운전자금 용도 확인", channel: "온라인 제출", owner: "심사역", type: "document", source: "고객" },
-      TAX: { name: "국세·지방세 완납증명서", why: "체납 여부 확인", channel: "온라인 제출", owner: "심사역", type: "document", source: "고객" },
-      GUARANTEE: { name: "보증서 및 보증 조건", why: "보증기관·보증금액·유효기간 확인", channel: "온라인 제출·기관 대조", owner: "보증 심사 담당", type: "document", source: "보증기관/고객" },
-      COLLATERAL_TITLE: { name: "담보 부동산 권리관계 서류", why: "소유권·선순위 권리 확인", channel: "온라인 제출·등기 대조", owner: "담보 심사 담당", type: "document", source: "등기/고객" },
-      APPRAISAL: { name: "부동산 감정평가서", why: "담보가치 확인", channel: "온라인 제출·심사역 검토", owner: "담보 심사 담당", type: "document", source: "평가기관" },
-      SITE_REPORT: { name: "담보 현장 확인 기록", why: "담보 물건의 현황 확인", channel: "현장 확인", owner: "담보 심사 담당", type: "onsite", source: "은행 현장" },
+    documents: {
+      REG: { name: "법인등기사항전부증명서", why: "법인 실재·현재 대표이사 확인", channel: "온라인 제출", source: "고객", type: "document" },
+      SEAL: { name: "법인인감증명서", why: "약정·위임 서류의 인감 대조", channel: "온라인 제출", source: "고객", type: "document" },
+      POA: { name: "대표이사 위임장", why: "대표이사 외 신청인의 위임 범위 확인", channel: "온라인 제출", source: "고객", type: "document" },
+      FS: { name: "최근 3년 재무제표", why: "재무 상태·상환능력 분석", channel: "DART 자동 수집 또는 온라인 제출", source: "DART/고객", type: "document" },
+      USE: { name: "자금 사용 계획서", why: "운전자금 용도 확인", channel: "온라인 제출", source: "고객", type: "document" },
+      TAX: { name: "국세·지방세 완납증명서", why: "체납 여부 확인", channel: "온라인 제출", source: "고객", type: "document" },
+      GUARANTEE: { name: "보증서 및 보증 조건", why: "보증기관·보증금액·유효기간 확인", channel: "온라인 제출·기관 대조", source: "보증기관/고객", type: "document" },
+      COLLATERAL_TITLE: { name: "담보 부동산 권리관계 서류", why: "소유권·선순위 권리 확인", channel: "온라인 제출·등기 대조", source: "등기/고객", type: "document" },
+      APPRAISAL: { name: "부동산 감정평가서", why: "담보가치 확인", channel: "온라인 제출", source: "평가기관", type: "document" },
+      SITE_REPORT: { name: "담보 현장 확인 기록", why: "담보 물건의 현황 확인", channel: "현장 확인", source: "은행 담당자", type: "onsite" },
+    },
+    tasks: {
+      AUTH: {
+        name: "차입 권한 확인", owner: "심사역", docs: ["REG", "SEAL"], refs: ["공시 임원현황 (DART 자동 조회)"],
+        extra: [{ doc: "POA", when: "proxy", text: "대리 신청 시 대표이사 위임장 추가 요청" }],
+        criteria: "신청인과 공시·등기상 대표이사의 일치 여부. 불일치 시 위임장과 법인인감 대조",
+        fns: ["checkAuthority"],
+      },
+      FIN: {
+        name: "재무 상태 확인", owner: "심사역", docs: ["FS"], refs: ["DART 공시 목록·감사의견"],
+        criteria: "공시 자료 검증(정보 시점·연결 범위·출처 대조·재작성), 부채비율·유동비율·이자보상배율",
+        fns: ["validateFacts", "calcRatios", "summarizeDebt"],
+      },
+      REPAY: {
+        name: "상환능력 분석", owner: "심사역", docs: [], refs: ["재무제표·차입금 집계 결과"],
+        criteria: "매출 감소·금리 상승 시나리오별 최소 DSCR, 위험 신호 점수",
+        fns: ["simulateRepayment", "riskSignals"],
+      },
+      USE: {
+        name: "자금 용도 확인", owner: "심사역", docs: ["USE"], refs: [],
+        criteria: "신청 금액과 운전자금 소요의 부합 여부",
+        fns: [],
+      },
+      TAX: {
+        name: "체납 확인", owner: "심사역", docs: ["TAX"], refs: [],
+        criteria: "국세·지방세 체납 없음",
+        fns: [],
+      },
+      GUAR: {
+        name: "보증 확인", owner: "보증 심사 담당", docs: ["GUARANTEE"], refs: ["보증기관 조회"],
+        criteria: "보증금액·보증기간의 대출 조건 충족 여부",
+        fns: [],
+      },
+      COLL: {
+        name: "담보 확인", owner: "담보 심사 담당", docs: ["COLLATERAL_TITLE", "APPRAISAL"], refs: ["부동산 등기 조회"],
+        criteria: "선순위 권리 차감 후 담보가치의 대출 금액 충족 여부",
+        fns: [],
+      },
+      SITE: {
+        name: "담보 현장 확인", owner: "담보 심사 담당", docs: ["SITE_REPORT"], refs: [],
+        criteria: "담보 물건 현황과 감정평가 내용의 일치 여부",
+        fns: [],
+      },
+      EXTRA: {
+        name: "추가 확인 항목 선택", owner: "심사역", docs: [], refs: ["위험 신호 구간별 상환곤란 확률"],
+        criteria: "순정보가치(기대손실 감소 − 확인 비용)가 양수인 항목부터 요청, 확인 결과에 따라 재선정",
+        fns: ["nextBestAction"],
+      },
     },
     products: [
-      { id: "working", name: "중소법인 운전자금대출", note: "자금 용도·상환능력 확인", required: ["REG", "SEAL", "POA", "FS", "USE", "TAX"] },
-      { id: "guarantee", name: "법인 보증부대출 (가상)", note: "보증서 유효성·보증 조건 확인 추가", required: ["REG", "SEAL", "POA", "FS", "TAX", "GUARANTEE"] },
-      { id: "realestate", name: "법인 부동산담보대출 (가상)", note: "담보 권리관계·감정평가·현장 확인 추가", required: ["REG", "SEAL", "POA", "FS", "TAX", "COLLATERAL_TITLE", "APPRAISAL", "SITE_REPORT"] },
+      { id: "working", name: "중소법인 운전자금대출", note: "자금 용도·상환능력 확인", tasks: ["AUTH", "FIN", "REPAY", "USE", "TAX", "EXTRA"] },
+      { id: "guarantee", name: "법인 보증부대출 (가상)", note: "보증서 유효성·보증 조건 확인 추가", tasks: ["AUTH", "FIN", "REPAY", "TAX", "GUAR", "EXTRA"] },
+      { id: "realestate", name: "법인 부동산담보대출 (가상)", note: "담보 권리관계·감정평가·현장 확인 추가", tasks: ["AUTH", "FIN", "REPAY", "TAX", "COLL", "SITE", "EXTRA"] },
     ],
     approvalLimits: [
       { max: 3e9, role: "심사팀장" },
@@ -134,11 +183,11 @@ window.CREDITOS_SEED = {
       id: "new-credit", name: "신규 운전자금 심사", version: "1.0.0", status: "사용 중",
       requires: { objects: ["Company", "FinancialStatement", "Disclosure"], functions: [], actions: [] },
       adds: {
-        objects: ["LoanApplication", "Document", "ReviewTask", "LoanProduct", "CheckItem"],
+        objects: ["LoanApplication", "Document", "ReviewTask", "LoanProduct", "ReviewActivity"],
         functions: ["summarizeDebt", "calcRatios", "validateFacts", "checkAuthority", "riskSignals", "simulateRepayment", "compileWorkflow", "policyCheck", "nextBestAction"],
         actions: ["CreateCaseFromWorkflow", "RequestDocument", "SubmitDocument", "ReviewUploadedDocument", "RecordSiteInspection", "AssignReviewer", "RecordOpinion", "RecordDecision"],
       },
-      config: ["상품별 심사 절차 온톨로지", "승인 권한 한도", "정보가치 가정값"],
+      config: ["심사 온톨로지 (업무·자료·담당·판단 기준)", "승인 권한 한도", "정보가치 가정값"],
     },
     {
       id: "renewal", name: "만기연장 심사", version: "1.0.0", status: "사용 중",
