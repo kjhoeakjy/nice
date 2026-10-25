@@ -311,3 +311,10 @@ nav { background: #FBFAF7; }
 .crumb { margin-bottom: 6px; }
 @media (min-width: 901px) { main { padding: 24px 32px 64px; max-width: 1180px; } }
 @media (max-width: 600px) { .card { padding: 14px; } h1 { font-size: 18px; } }
+.t td.judge { white-space: nowrap; }
+.t td.judge .lv { margin-right: 6px; }
+@media (max-width: 600px) {
+  .chart .axis { font-size: 17px; }
+  .chart .val { font-size: 17px; }
+  .t.stack td.judge { align-items: center; }
+}

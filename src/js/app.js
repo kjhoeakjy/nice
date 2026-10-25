@@ -626,10 +626,11 @@
     // 5. 추가 확인 항목 선택
     const requested = (name) => c.requests.some((x) => x.name === name);
     const s5 = step(5, "추가 확인 항목 선택", `
-      <table class="t num mstack"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th></th></tr>
+      <table class="t num mstack"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th>판단</th></tr>
         ${nba.ranked.map((a) => `<tr><td class="l">${esc(a.name)}</td><td>${fmt(a.evi, 2)}</td><td>${fmt(a.cost, 2)}</td>
           <td class="${a.net > 0 ? "ok-t" : "muted"}">${fmt(a.net, 2)}</td>
-          <td>${requested(a.name) ? '<span class="muted">요청함</span>' : a.recommend ? `<button data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="순정보가치 양수">요청</button>` : '<span class="muted">보류</span>'}</td></tr>`).join("")}</table>
+          <td class="judge">${a.recommend ? `<span class="lv lv-ok">권고</span>` : `<span class="lv lv-info">보류</span>`}
+            ${requested(a.name) ? '<span class="muted small">요청함</span>' : a.recommend ? `<button class="small" data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="순정보가치 양수">요청</button>` : ""}</td></tr>`).join("")}</table>
       <h3>요청 방식 비교</h3>
       <table class="t num mstack"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
         ${nba.compare.map((x, i) => `<tr class="${i === 2 ? "hlrow" : ""}"><td class="l">${esc(x.name)}</td><td>${x.count.toFixed(2)}</td><td>${fmt(x.cost, 2)}</td><td>${fmt(x.loss, 2)}</td><td><b>${fmt(x.cost + x.loss, 2)}</b></td></tr>`).join("")}</table>
