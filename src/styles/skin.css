@@ -215,7 +215,7 @@ nav::-webkit-scrollbar { height: 0; }
 .onto-node.l3, .onto-node.r3 { grid-row: 3; }
 .onto-node.l1::after, .onto-node.l2::after, .onto-node.l3::after { content: ""; position: absolute; top: 50%; right: -37px; width: 36px; border-top: 1px solid var(--line-strong); }
 .onto-node.r1::before, .onto-node.r2::before, .onto-node.r3::before { content: ""; position: absolute; top: 50%; left: -37px; width: 36px; border-top: 1px solid var(--line-strong); }
-.onto-center { grid-column: 2; grid-row: 1 / span 3; align-self: center; text-align: center; background: var(--top); color: #fff; border-radius: 4px; padding: 18px 12px; }
+.onto-center { grid-column: 2; grid-row: 1 / span 3; align-self: stretch; display: flex; flex-direction: column; justify-content: center; text-align: center; background: var(--top); color: #fff; border-radius: 4px; padding: 18px 12px; }
 .onto-center small { display: block; font-size: 11px; color: rgba(255,255,255,.7); }
 .onto-center b { display: block; font-size: 17px; margin: 4px 0; }
 .onto-center span { font-size: 11.5px; color: var(--yellow); }
@@ -286,3 +286,4 @@ nav::-webkit-scrollbar { height: 0; }
 .guide { margin-bottom: 12px; }
 @media (max-width: 400px) { .fin5 tr > :nth-child(2) { display: none; } }
 body { word-break: keep-all; overflow-wrap: break-word; }
+.step .chart { max-width: 620px; display: block; }

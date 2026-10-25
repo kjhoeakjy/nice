@@ -329,6 +329,8 @@
     const bw = (w - pad) / series.length;
     const y0 = 8 + ((max) / range) * (h - 30);
     const bars = series.map((s, i) => {
+      if (s.value == null) return `<g><text class="axis" x="${pad + i * bw + bw / 2}" y="${h - 4}" text-anchor="middle">${esc(s.label)}</text>
+        <text class="axis" x="${pad + i * bw + bw / 2}" y="${y0 - 4}" text-anchor="middle">−<title>자료 없음</title></text></g>`;
       const v = s.value || 0;
       const bh = (Math.abs(v) / range) * (h - 30);
       const y = v >= 0 ? y0 - bh : y0;
@@ -404,7 +406,7 @@
     const pages = { home: pageHome, company: pageCompany, cases: pageHome, case: pageCase, loans: pageLoans, loan: pageLoan,
       monitor: pageMonitor, workflow: pageWorkflow, guide: pageGuide, model: pageModel, basis: pageModel, packages: pagePackages, audit: pageAudit, portal: pagePortal };
     const crumb = r.page === "case" || r.page === "loan" || (r.page === "company" && r.id)
-      ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.id || "")}</b>`
+      ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.page === "company" ? (company(r.id) || {}).name || "" : r.id || "")}</b>`
       : "";
     main.innerHTML = (crumb ? `<div class="crumb keep">${crumb}</div>` : "") + (pages[r.page] || pageHome)(r);
     main.querySelectorAll("table.t:not(.num), table.t.mstack").forEach((tb) => {
@@ -463,7 +465,8 @@
     const tabs = [["overview", "개요"], ["fin", "재무"], ["debt", "차입·사채"]];
     const body = { overview: coOverview, fin: coFin, debt: coDebt, disc: coDisc, rel: coRel }[companyTab](c);
     return `
-      <div class="row-between"><h1>${esc(c.name)}</h1></div>
+      <div class="row-between"><h1>${esc(c.name)}</h1>
+        <select id="coSel" title="기업 선택">${Object.values(DATA.companies).map((x) => `<option value="${x.corp_code}" ${x.corp_code === c.corp_code ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>
       <p class="sub">${esc(c.market)} ${esc(c.stock_code)} · ${tag("PUBLIC")} 기준일 이전 공시</p>
       <div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${companyTab === k ? "on" : ""}" data-tab="${k}">${l}</button>`).join("")}</div>
       ${body}`;
@@ -513,11 +516,11 @@
     return `
       <section class="card"><h2>${y}년 말 차입금 구성 (별도)</h2>
         <table class="t num"><tr><th>계정</th><th>금액</th><th>1년 내 만기</th></tr>
-        ${d.parts.map((p) => `<tr><td>${p.label}</td><td>${p.found ? fmt(p.value) : "-"}</td><td>${["st_borrowings", "cur_lt_borrowings", "cur_cb", "cur_lease"].includes(p.key) ? "예" : ""}</td></tr>`).join("")}
+        ${d.parts.map((p) => `<tr><td>${p.label}</td><td>${p.found ? fmt(p.value) : "-"}</td><td>${p.found && ["st_borrowings", "cur_lt_borrowings", "cur_cb", "cur_lease"].includes(p.key) ? "예" : ""}</td></tr>`).join("")}
         <tr class="sum"><td>합계</td><td>${fmt(d.total)}</td><td>${fmt(d.dueWithinYear)}</td></tr></table></section>
       <section class="card"><h2>전환사채 발행 조건 ${tag("PUBLIC")}</h2>
         ${c.bonds.length ? `<table class="t"><tr><th>회차</th><th>발행금액</th><th>표면이자율</th><th>만기보장수익률</th><th>만기일</th><th>원문</th></tr>
-        ${c.bonds.slice().sort((a, b) => +a.seq - +b.seq).map((b) => `<tr><td>${esc(b.seq)}</td><td>${fmt(b.amount)}</td><td>${esc(b.coupon)}%</td><td>${esc(b.ytm)}%</td><td>${esc(b.maturity)}</td><td>${dartLink(b.rcept_no, "보기")}</td></tr>`).join("")}</table>` : `<p class="empty">전환사채 발행 공시가 없습니다.</p>`}</section>`;
+        ${c.bonds.slice().sort((a, b) => +a.seq - +b.seq).map((b) => `<tr><td>${esc(b.seq)}</td><td>${fmt(b.amount)}</td><td>${isNaN(+b.coupon) ? esc(b.coupon) : (+b.coupon).toFixed(1) + "%"}</td><td>${isNaN(+b.ytm) ? esc(b.ytm) : (+b.ytm).toFixed(1) + "%"}</td><td>${esc(b.maturity)}</td><td>${dartLink(b.rcept_no, "보기")}</td></tr>`).join("")}</table>` : `<p class="empty">전환사채 발행 공시가 없습니다.</p>`}</section>`;
   }
 
   function coDisc(c) {
@@ -622,6 +625,7 @@
 
     // 4. 상환능력
     const s4 = step(4, "상환능력 분석", `
+      <h3>시나리오별 최소 DSCR (기존 차입금 포함)</h3>
       ${barChart(sim.results.map((s) => ({ label: s.name, value: isFinite(s.minDscr) ? s.minDscr : 0 })), { fmt: (v) => v.toFixed(2), line: 1, lineLabel: "1.0", width: 520, title: "시나리오별 최소 DSCR (기존 차입금 포함)", values: true })}`);
 
     // 5. 추가 확인 항목 선택
@@ -634,7 +638,7 @@
       <h3>요청 방식 비교</h3>
       <table class="t num mstack"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
         ${nba.compare.map((x, i) => `<tr class="${i === 2 ? "hlrow" : ""}"><td class="l">${esc(x.name)}</td><td>${x.count.toFixed(2)}</td><td>${fmt(x.cost, 2)}</td><td>${fmt(x.loss, 2)}</td><td><b>${fmt(x.cost + x.loss, 2)}</b></td></tr>`).join("")}</table>
-      <p class="note"><a href="#/model">모델 설명</a></p>`);
+      <p class="note">계산 방식: <a href="#/model">모델 설명</a></p>`);
 
     // 6. 추가 자료 요청·승인
     const canDecide = u.canApprove > 0;
@@ -705,7 +709,7 @@
     const dleft = Math.round(C.monthsBetween(ASOF, l.maturity) * 30);
     const late = l.repayments.filter((p) => p[3] !== "정상").length;
     return `
-      <h1>${l.id} <span class="h1-co">${esc(co.name)}</span></h1><p class="sub">${esc(l.product)}</p>
+      <h1>${l.id} <span class="h1-co"><a href="#/company/${co.corp_code}">${esc(co.name)}</a></span></h1><p class="sub">${esc(l.product)}</p>
       <div class="grid4">
         <div class="kpi"><div class="k">잔액</div><div class="v">${fmt(l.balance)}</div></div>
         <div class="kpi"><div class="k">금리</div><div class="v">${l.rate}%</div></div>
@@ -717,7 +721,7 @@
           ${rc ? `<p><a href="#/case/${rc.id}">${rc.id}</a> ${statusBadge(rc.status)}</p>` : `<button data-act="StartRenewalReview" data-loan="${l.id}">만기연장 심사 시작</button>`}</section>
         <section class="card"><h2>약정 점검</h2><ul class="checks">${cov.map((k) => `<li>${levelBadge(k.ok === true ? "통과" : k.ok === false ? "확인 필요" : "정보")}<div><b>${esc(k.ok === null ? k.name : k.text)}</b></div></li>`).join("")}</ul></section>
       </div>
-      <section class="card"><h2>대출 실행 이후 공시 사건</h2>${eventTable(evs)}</section>`;
+      <section class="card"><h2>대출 실행 이후 공시 사건</h2>${eventTable(evs, false)}</section>`;
   }
 
   // ------------------------------------------------------------ 사후 모니터링
@@ -734,13 +738,13 @@
   }
 
   // 중요도 '검토' 이상만 표시
-  function eventTable(evs) {
+  function eventTable(evs, showLoan = true) {
     evs = evs.filter((e) => e.severity !== "참고");
     if (!evs.length) return `<p class="empty">검토 대상 사건이 없습니다.</p>`;
-    return `<table class="t"><tr><th>일자</th><th>중요도</th><th>내용</th><th>대출</th><th>처리</th></tr>
+    return `<table class="t"><tr><th>일자</th><th>중요도</th><th>내용</th>${showLoan ? "<th>대출</th>" : ""}<th>처리</th></tr>
       ${evs.map((e) => { const s = S.events[e.key];
         return `<tr><td>${d8(e.date)}</td><td>${levelBadge(e.severity)}</td><td>${esc(e.title)} ${dartLink(e.rcept_no, "원문")}</td>
-        <td>${e.loans.map((x) => `<a href="#/loan/${x}">${x}</a>`).join(", ")}</td>
+        ${showLoan ? `<td>${e.loans.map((x) => `<a href="#/loan/${x}">${x}</a>`).join(", ")}</td>` : ""}
         <td>${!s ? `<button data-act="CreateMonitoringTask" data-key="${esc(e.key)}" data-title="${esc(e.title)}" data-loanid="${e.loans[0]}">검토 업무 생성</button>`
           : s.status === "종결" ? `<span class="muted">종결</span>`
           : `<form class="inline" data-form="close" data-key="${esc(e.key)}" data-title="${esc(e.title)}"><input name="note" placeholder="종결 사유" required><button type="submit" class="ghost small">종결</button></form>`}</td></tr>`; }).join("")}</table>`;
@@ -1011,7 +1015,8 @@
     const reqs = myRequests();
     const steps = ["접수", "자료 확인", "심사", "결정"];
     const stepOf = (c) => (c.decision ? 3 : c.opinions.length ? 2 : 1);
-    return `<h1>${esc(co.name)} 대출 진행 현황</h1><p class="sub">${esc(u.name)}님, 은행이 요청한 자료를 여기서 제출할 수 있습니다.</p>
+    return `<div class="row-between"><h1>${esc(co.name)} 대출 진행 현황</h1><button type="button" class="ghost small" data-role="u1">심사역 화면으로 전환</button></div>
+      <p class="sub">${esc(u.name)}님, 은행이 요청한 자료를 여기서 제출할 수 있습니다.</p>
       ${mine.map((c) => `<section class="card"><h2>${c.kind === "new" ? "신규 대출 신청" : "만기연장"} ${c.id}</h2>
         <p>${esc(c.product)} · ${fmt(c.amount)} · ${c.years}년</p>
         <ol class="progress">${steps.map((s, i) => `<li class="${i <= stepOf(c) ? "done" : ""}">${s}</li>`).join("")}</ol>

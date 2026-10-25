@@ -203,7 +203,7 @@
 
     // 7) 감사의견
     const au = company.audits[ly];
-    if (au) add(au.opinion.startsWith("적정") ? "통과" : "확인 필요", `${ly}년 감사의견 ${au.opinion}`, "",
+    if (au) add(au.opinion.startsWith("적정") ? "통과" : "확인 필요", `${ly}년 감사의견 ${au.opinion.replace(/의견$/, "")}`, "",
       [{ rcept_no: au.rcept_no, label: "감사보고서" }]);
     return out;
   }
@@ -235,16 +235,16 @@
   // ------------------------------------------------------------ 위험 신호 (설명용 규칙)
   // 실제 부도확률 모형이 아닙니다. 다음 업무 추천의 출발점으로 쓰는 단순 규칙입니다.
   const RISK_RULES = [
-    { id: "op_loss", text: "최근 3년 중 영업손실 연도 있음", pts: 1,
+    { id: "op_loss", text: "최근 3년 내 영업손실", pts: 1,
       test: (c, y, a) => availableYears(c, "OFS", a).slice(-3).some((yy) => (val(c, "OFS", yy, "op_income") || 0) < 0) },
-    { id: "coverage", text: "영업이익 / 금융원가 < 1", pts: 2,
+    { id: "coverage", text: "이자보상배율 1 미만", pts: 2,
       test: (c, y) => { const f = val(c, "OFS", y, "finance_costs"); return f > 0 && (val(c, "OFS", y, "op_income") || 0) / f < 1; } },
-    { id: "short_debt", text: "1년 내 갚을 차입금 > 현금 + 영업활동현금흐름", pts: 2,
+    { id: "short_debt", text: "1년 내 만기 차입금이 현금·영업현금흐름 초과", pts: 2,
       test: (c, y) => sub("summarizeDebt", c, "OFS", y).dueWithinYear > (val(c, "OFS", y, "cash") || 0) + Math.max(0, val(c, "OFS", y, "op_cf") || 0) },
     { id: "lev", text: "부채비율 200% 초과", pts: 1,
       test: (c, y) => { const e = val(c, "OFS", y, "equity"); return e > 0 && val(c, "OFS", y, "liabilities") / e > 2; } },
     { id: "cash_burn", text: "영업활동현금흐름 음수", pts: 1, test: (c, y) => (val(c, "OFS", y, "op_cf") || 0) < 0 },
-    { id: "sales_drop", text: "매출 전년 대비 10% 이상 감소", pts: 1,
+    { id: "sales_drop", text: "매출 10% 이상 감소", pts: 1,
       test: (c, y) => { const p = val(c, "OFS", String(+y - 1), "revenue"), r = val(c, "OFS", y, "revenue"); return p > 0 && r / p < 0.9; } },
   ];
   const BANDS = [
