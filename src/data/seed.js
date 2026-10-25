@@ -46,17 +46,17 @@ window.CREDITOS_SEED = {
       AUTH: {
         name: "차입 권한 확인", owner: "심사역", docs: ["REG", "SEAL"], refs: ["공시 임원현황 (DART 자동 조회)"],
         extra: [{ doc: "POA", when: "proxy", text: "대리 신청 시 대표이사 위임장 추가 요청" }],
-        criteria: "신청인과 공시·등기상 대표이사의 일치 여부. 불일치 시 위임장과 법인인감 대조",
+        criteria: "신청인과 대표이사 일치 여부, 불일치 시 위임장·인감 대조",
         fns: ["checkAuthority"],
       },
       FIN: {
         name: "재무 상태 확인", owner: "심사역", docs: ["FS"], refs: ["DART 공시 목록·감사의견"],
-        criteria: "공시 자료 검증(정보 시점·연결 범위·출처 대조·재작성), 부채비율·유동비율·이자보상배율",
+        criteria: "공시 자료 검증, 부채비율·유동비율·이자보상배율",
         fns: ["validateFacts", "calcRatios", "summarizeDebt"],
       },
       REPAY: {
         name: "상환능력 분석", owner: "심사역", docs: [], refs: ["재무제표·차입금 집계 결과"],
-        criteria: "매출 감소·금리 상승 시나리오별 최소 DSCR, 위험 신호 점수",
+        criteria: "시나리오별 최소 DSCR, 위험 신호",
         fns: ["simulateRepayment", "riskSignals"],
       },
       USE: {
@@ -76,7 +76,7 @@ window.CREDITOS_SEED = {
       },
       COLL: {
         name: "담보 확인", owner: "담보 심사 담당", docs: ["COLLATERAL_TITLE", "APPRAISAL"], refs: ["부동산 등기 조회"],
-        criteria: "선순위 권리 차감 후 담보가치의 대출 금액 충족 여부",
+        criteria: "선순위 권리 차감 후 담보가치 충족 여부",
         fns: [],
       },
       SITE: {
@@ -86,7 +86,7 @@ window.CREDITOS_SEED = {
       },
       EXTRA: {
         name: "추가 확인 항목 선택", owner: "심사역", docs: [], refs: ["위험 신호 구간별 부도확률(가정)"],
-        criteria: "순정보가치(기대손실 감소 − 확인 비용)가 양수인 항목부터 요청, 확인 결과에 따라 재선정",
+        criteria: "순정보가치가 양수인 항목부터 요청",
         fns: ["nextBestAction"],
       },
     },

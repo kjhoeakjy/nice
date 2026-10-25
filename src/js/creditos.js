@@ -121,30 +121,28 @@
     // 1) 정보 시점
     const ly = latestYear(company, "OFS", asOf);
     if (!ly) {
-      add("확인 필요", "분석 기준일 기준 사용 가능한 재무제표 없음", "공시된 사업보고서가 없습니다.");
+      add("확인 필요", "사용 가능한 재무제표 없음", "사업보고서 미공시");
       return out;
     }
     const st = company.financials.OFS[ly];
     const age = monthsBetween(st.period_end, asOf);
-    add(age > 6 ? "확인 필요" : "통과", `최근 결산 자료 시점: ${ly}년 말 (${Math.floor(age)}개월 경과)`,
-      age > 6 ? "결산일로부터 6개월이 지났습니다. 이후 실적은 반기·분기 보고서나 최근 매출 자료로 확인해야 합니다."
-              : "최근 결산 자료를 사용할 수 있습니다.",
+    add(age > 6 ? "확인 필요" : "통과", `${ly}년 결산 후 ${Math.floor(age)}개월 경과`,
+      age > 6 ? "반기·분기 실적 확인 필요" : "",
       [{ rcept_no: st.rcept_no, label: `${ly} 사업보고서` }]);
     const futureYears = Object.keys(company.financials.OFS).filter((y) => company.financials.OFS[y].published > ymd(asOf));
     if (futureYears.length)
-      add("정보", "분석 기준일 이후 공시 제외", `${futureYears.join(", ")}년 자료는 기준일 이후에 공시되어 분석에서 뺐습니다.`);
+      add("정보", `기준일 이후 공시 제외 (${futureYears.join(", ")}년)`, "");
 
     // 2) 연결/별도 범위
     const lc = latestYear(company, "CFS", asOf);
     if (lc && lc < ly) {
-      add("확인 필요", `연결재무제표가 ${lc}년까지만 있음`,
-        `${+lc + 1}년부터는 별도재무제표만 공시되었습니다. 종속회사 처분 등 연결 범위 변동 여부를 확인해야 합니다. 이 기업에 대한 대출 심사는 대출 신청 법인 자체의 별도재무제표를 기준으로 합니다.`);
+      add("확인 필요", `${+lc + 1}년 이후 연결재무제표 미공시`, "연결 범위 변동 확인 (심사는 별도재무제표 기준)");
     } else if (lc) {
       const r = val(company, "OFS", ly, "revenue"), rc = val(company, "CFS", lc, "revenue");
       if (r && rc && rc / r > 1.3)
-        add("정보", "연결 매출이 별도 매출보다 큼", `${ly}년 별도 ${fmtEok(r)}, 연결 ${fmtEok(rc)}. 종속회사 실적이 포함된 수치이므로 법인 자체 상환능력과 구분합니다.`);
+        add("정보", `연결 매출 ${fmtEok(rc)} (별도 ${fmtEok(r)})`, "");
     } else {
-      add("정보", "연결재무제표 없음", "별도재무제표만 공시하는 기업입니다.");
+      add("정보", "연결재무제표 없음", "");
     }
 
     // 3) 재무상태표 등식
@@ -154,8 +152,8 @@
       const a = val(company, sc, y, "assets"), l = val(company, sc, y, "liabilities"), e = val(company, sc, y, "equity");
       if (a == null || l == null || e == null) return;
       const diff = Math.abs(a - l - e);
-      add(diff > 1e6 ? "확인 필요" : "통과", `${sc === "OFS" ? "별도" : "연결"} ${y} 자산 = 부채 + 자본`,
-        diff > 1e6 ? `차이 ${fmtEok(diff)}. 원문 대조가 필요합니다.` : "일치합니다.");
+      add(diff > 1e6 ? "확인 필요" : "통과", `${sc === "OFS" ? "별도" : "연결"} ${y} 재무상태표 등식 ${diff > 1e6 ? "불일치" : "일치"}`,
+        diff > 1e6 ? `차이 ${fmtEok(diff)}` : "");
     });
 
     // 4) 출처 간 교차 확인: 주요계정 API vs 전체 재무제표 API
@@ -171,8 +169,8 @@
       });
     });
     if (checked)
-      add(mism.length ? "확인 필요" : "통과", `두 가지 DART 출처 값 대조 (${checked}개 항목)`,
-        mism.length ? mism.join("; ") : "주요계정 API와 전체 재무제표 API 값이 같습니다.");
+      add(mism.length ? "확인 필요" : "통과", `주요계정·재무제표 대조 ${checked}개 항목 ${mism.length ? "불일치" : "일치"}`,
+        mism.join("; "));
 
     // 5) 전년도 수치 재작성
     const restated = [];
@@ -184,13 +182,11 @@
       Object.keys(pr).forEach((k) => {
         const orig = val(company, "OFS", prev, k);
         if (orig != null && Math.abs(pr[k] - orig) > Math.max(1e7, Math.abs(orig) * 0.005))
-          restated.push(`${prev} ${LABELS[k]}: 최초 ${fmtEok(orig)} → ${y} 보고서 비교표시 ${fmtEok(pr[k])}`);
+          restated.push(`${prev} ${LABELS[k]} ${fmtEok(orig)}에서 ${fmtEok(pr[k])}로 변경`);
       });
     });
-    add(restated.length ? "확인 필요" : "통과", "전년도 수치 재작성 여부",
-      restated.length ? restated.slice(-4).join("; ") + (restated.length > 4 ? ` 외 ${restated.length - 4}건` : "") +
-        ". 재작성 사유(회계정책 변경, 오류 수정 등)를 주석에서 확인합니다."
-        : "다음 해 보고서의 비교표시 금액이 최초 공시와 같습니다.");
+    add(restated.length ? "확인 필요" : "통과", `전년도 수치 재작성 ${restated.length ? "있음" : "없음"}`,
+      restated.length ? restated.slice(-3).join("; ") + (restated.length > 3 ? ` 외 ${restated.length - 3}건` : "") + ". 재작성 사유 확인" : "");
 
     // 6) 사채 만기
     (company.bonds || []).forEach((b) => {
@@ -200,14 +196,14 @@
       if (left > -6 && left < 12) {
         const cur = val(company, "OFS", ly, "cur_cb");
         add("확인 필요", `전환사채 ${b.seq}회차 만기 ${b.maturity}`,
-          `발행금액 ${fmtEok(b.amount)}, 만기보장수익률 ${b.ytm}%. ${ly}년 말 유동성전환사채 잔액 ${fmtEok(cur || 0)}. 상환·전환 여부와 상환 재원을 확인해야 합니다.`,
+          `발행금액 ${fmtEok(b.amount)}, ${ly}년 말 유동성전환사채 ${fmtEok(cur || 0)}. 상환·전환 여부 확인`,
           [{ rcept_no: b.rcept_no, label: "전환사채 발행결정" }]);
       }
     });
 
     // 7) 감사의견
     const au = company.audits[ly];
-    if (au) add(au.opinion.startsWith("적정") ? "통과" : "확인 필요", `${ly}년 감사의견: ${au.opinion}`, `감사인 ${au.auditor}`,
+    if (au) add(au.opinion.startsWith("적정") ? "통과" : "확인 필요", `${ly}년 감사의견 ${au.opinion}`, "",
       [{ rcept_no: au.rcept_no, label: "감사보고서" }]);
     return out;
   }
@@ -220,17 +216,17 @@
     const isCeo = ceos.includes(sub.name);
     findings.push({
       level: "정보",
-      title: `공시상 대표이사: ${ceos.join(", ") || "확인 안 됨"}`,
-      detail: `${company.executives.year}년 사업보고서 임원현황 기준입니다. 이후 변경이 있었을 수 있으므로 법인등기사항증명서로 다시 확인합니다.`,
+      title: `공시상 대표이사 ${ceos.join(", ") || "확인 불가"}`,
+      detail: "",
       refs: company.executives.rows[0] ? [{ rcept_no: company.executives.rows[0].rcept_no, label: "임원현황" }] : [],
     });
     if (isCeo) {
-      findings.push({ level: "통과", title: "신청인이 공시상 대표이사와 같음", detail: "본인확인과 법인인감 확인으로 진행합니다." });
+      findings.push({ level: "통과", title: "신청인과 공시상 대표이사 일치", detail: "" });
     } else {
       findings.push({
         level: "확인 필요",
-        title: `신청인(${sub.name}, ${sub.role})은 대표이사가 아님`,
-        detail: "대리 신청입니다. 대표이사 명의 위임장과 법인인감증명서가 필요합니다. 이름 일치 여부는 참고용이며 법적 권한을 확정하지 않습니다.",
+        title: `대리 신청 (${sub.name} ${sub.role})`,
+        detail: "대표이사 위임장·법인인감 확인 필요",
       });
     }
     return { ceos, isCeo, findings, needsPowerOfAttorney: !isCeo };

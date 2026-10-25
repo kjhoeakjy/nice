@@ -360,7 +360,7 @@
   const NAV_STAFF = [
     ["@", "심사 업무"], ["home", "업무 현황"], ["workflow", "심사 온톨로지"], ["company", "기업 정보"],
     ["@", "여신 관리"], ["loans", "실행 여신"], ["monitor", "사후 모니터링"],
-    ["@", "운영"], ["basis", "산정 기준"], ["packages", "업무 기능 관리"], ["audit", "처리 기록"],
+    ["@", "기준"], ["basis", "산정 기준"],
   ];
   const NAV_CUSTOMER = [["@", "고객 서비스"], ["portal", "요청 자료 제출"]];
   const PAGE_LABEL = { home: "업무 현황", cases: "업무 현황", case: "업무 현황", company: "기업 정보", loans: "실행 여신", loan: "실행 여신",
@@ -404,8 +404,8 @@
       monitor: pageMonitor, workflow: pageWorkflow, basis: pageBasis, packages: pagePackages, audit: pageAudit, portal: pagePortal };
     const crumb = r.page === "case" || r.page === "loan" || (r.page === "company" && r.id)
       ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.id || "")}</b>`
-      : `<b>${PAGE_LABEL[r.page] || "업무 현황"}</b>`;
-    main.innerHTML = `<div class="crumb keep">${crumb}</div>` + (pages[r.page] || pageHome)(r);
+      : "";
+    main.innerHTML = (crumb ? `<div class="crumb keep">${crumb}</div>` : "") + (pages[r.page] || pageHome)(r);
     main.querySelectorAll("table.t:not(.num)").forEach((tb) => {
       const hr = tb.querySelector("tr"); if (!hr) return;
       const ths = Array.from(hr.children).map((h) => h.textContent.trim());
@@ -422,43 +422,31 @@
 
   // ------------------------------------------------------------ 업무 현황
   function pageHome() {
-    const u = user();
-    const mine = S.cases.slice();
     const waiting = S.cases.flatMap((c) => c.requests.filter((r) => r.status === "제출됨").map((r) => ({ c, r })));
-    const evs = monitorEvents().filter((e) => !S.events[e.key] && e.severity !== "참고");
     const dueLoans = S.loans.filter((l) => C.monthsBetween(ASOF, l.maturity) <= 2 && !S.cases.some((c) => c.loanId === l.id));
+    const open = S.tasks.filter((t) => t.status !== "완료");
     return `
       <h1>업무 현황</h1>
-      <p class="sub">${esc(u.name)} · ${esc(u.role)} · 기준일 ${ASOF}</p>
-      <div class="grid4">
-        <div class="kpi"><div class="k">진행 중 심사</div><div class="v">${mine.filter((c) => !c.decision).length}건</div></div>
-        <div class="kpi"><div class="k">확인할 제출 자료</div><div class="v">${waiting.length}건</div></div>
-        <div class="kpi"><div class="k">미처리 공시 사건</div><div class="v">${evs.length}건</div></div>
-        <div class="kpi"><div class="k">만기 60일 이내 여신</div><div class="v">${dueLoans.length}건</div></div>
+      <div class="guide">
+        <a href="#/workflow"><b>심사 온톨로지</b><span>심사 업무별 자료·담당·판단 기준·승인의 연결</span></a>
+        <a href="#/case/APP-2026-0412"><b>온톨로지 기반 심사</b><span>신청부터 승인까지</span></a>
+        <a href="#/case/APP-2026-0412/evi"><b>정보가치 기반 추가 확인</b><span>기대손실 감소와 확인 비용의 비교</span></a>
       </div>
-      <section class="card workflow-intro"><h2>시연 구성</h2>
-        <div class="guide">
-          <a href="#/workflow"><b>심사 온톨로지</b><span>심사 업무별 필요 자료·담당·판단 기준·전결권자의 연결과 상품·기업 조건별 절차 구성</span></a>
-          <a href="#/case/APP-2026-0412"><b>온톨로지 기반 심사</b><span>신청 정보 확인, 추가 자료 요청, 재무지표 산출, 상환능력 분석, 승인 요청</span></a>
-          <a href="#/case/APP-2026-0412/evi"><b>정보가치 기반 추가 확인 항목 선택</b><span>기대손실 감소와 확인 비용의 비교에 따른 추가 자료 선택</span></a>
-        </div>
-        <p class="note">데이터 항목, 계산식, 가정값의 근거: <a href="#/basis">산정 기준</a></p></section>
-      <section class="card"><h2>심사 건</h2>${caseTable(mine)}</section>
-      ${waiting.length ? `<section class="card"><h2>고객이 제출한 자료</h2><table class="t"><tr><th>신청 건</th><th>자료</th><th>파일</th><th>제출 시각</th><th></th></tr>
-        ${waiting.map(({ c, r }) => `<tr><td><a href="#/case/${c.id}">${c.id}</a></td><td>${esc(r.name)}</td><td>${esc(r.file)}</td><td>${esc(r.submittedAt)}</td><td><a href="#/case/${c.id}">확인하러 가기</a></td></tr>`).join("")}</table></section>` : ""}
+      <section class="card"><h2>심사 건</h2>${caseTable(S.cases)}</section>
+      ${waiting.length ? `<section class="card"><h2>고객 제출 자료</h2><table class="t"><tr><th>신청 건</th><th>자료</th><th>제출</th></tr>
+        ${waiting.map(({ c, r }) => `<tr><td><a href="#/case/${c.id}">${c.id}</a></td><td>${esc(r.name)}</td><td>${esc(r.submittedAt)}</td></tr>`).join("")}</table></section>` : ""}
       ${dueLoans.length ? `<section class="card"><h2>만기 도래 여신</h2><table class="t"><tr><th>대출</th><th>기업</th><th>잔액</th><th>만기</th><th></th></tr>
-        ${dueLoans.map((l) => `<tr><td><a href="#/loan/${l.id}">${l.id}</a></td><td>${esc(company(l.corp_code).name)}</td><td>${fmt(l.balance)}</td><td>${l.maturity} (D-${Math.round(C.monthsBetween(ASOF, l.maturity) * 30)})</td>
+        ${dueLoans.map((l) => `<tr><td><a href="#/loan/${l.id}">${l.id}</a></td><td>${esc(company(l.corp_code).name)}</td><td>${fmt(l.balance)}</td><td>${l.maturity}</td>
           <td><button data-act="StartRenewalReview" data-loan="${l.id}">만기연장 심사 시작</button></td></tr>`).join("")}</table></section>` : ""}
-      ${S.tasks.filter((t) => t.status !== "완료").length ? `<section class="card"><h2>검토 업무</h2><table class="t"><tr><th>업무</th><th>내용</th><th>대출</th><th>담당</th><th>생성</th></tr>
-        ${S.tasks.filter((t) => t.status !== "완료").map((t) => `<tr><td>${t.id}</td><td>${esc(t.title)}</td><td><a href="#/loan/${t.loanId}">${t.loanId}</a></td><td>${esc(userName(t.assignee))}</td><td>${t.createdAt}</td></tr>`).join("")}</table></section>` : ""}
-      <section class="card"><h2>최근 처리 기록</h2>${auditTable(S.audit.slice(0, 6))}</section>`;
+      ${open.length ? `<section class="card"><h2>검토 업무</h2><table class="t"><tr><th>업무</th><th>내용</th><th>대출</th></tr>
+        ${open.map((t) => `<tr><td>${t.id}</td><td>${esc(t.title)}</td><td><a href="#/loan/${t.loanId}">${t.loanId}</a></td></tr>`).join("")}</table></section>` : ""}`;
   }
 
   function caseTable(list) {
     if (!list.length) return `<p class="empty">진행 중인 건이 없습니다.</p>`;
-    return `<table class="t"><tr><th>번호</th><th>구분</th><th>기업</th><th>상품</th><th>금액</th><th>접수일</th><th>담당</th><th>상태</th></tr>
+    return `<table class="t"><tr><th>번호</th><th>구분</th><th>기업</th><th>상품</th><th>금액</th><th>상태</th></tr>
       ${list.map((c) => `<tr><td><a href="#/case/${c.id}">${c.id}</a></td><td>${c.kind === "new" ? "신규" : "만기연장"}</td><td>${esc(company(c.corp_code).name)}</td>
-        <td>${esc(c.product)}</td><td>${fmt(c.amount)}</td><td>${c.submittedAt}</td><td>${esc(userName(c.assignee))}</td><td>${statusBadge(c.status)}</td></tr>`).join("")}</table>`;
+        <td>${esc(c.product)}</td><td>${fmt(c.amount)}</td><td>${statusBadge(c.status)}</td></tr>`).join("")}</table>`;
   }
 
   function pageCases() {
@@ -475,7 +463,7 @@
     const body = { overview: coOverview, fin: coFin, debt: coDebt, disc: coDisc, rel: coRel }[companyTab](c);
     return `
       <div class="row-between"><h1>${esc(c.name)}</h1></div>
-      <p class="sub">${esc(c.market)} ${esc(c.stock_code)} · 고유번호 ${c.corp_code} · ${tag("PUBLIC")} 기준일 ${ASOF}까지 공시된 정보만 표시</p>
+      <p class="sub">${esc(c.market)} ${esc(c.stock_code)} · ${tag("PUBLIC")} 기준일 이전 공시</p>
       <div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${companyTab === k ? "on" : ""}" data-tab="${k}">${l}</button>`).join("")}</div>
       ${body}`;
   }
@@ -491,9 +479,9 @@
         <section class="card"><h2>기본 정보</h2><dl class="dl">
           <dt>대표이사</dt><dd>${esc(c.ceo)}</dd><dt>설립일</dt><dd>${d8(c.est_dt)}</dd>
           <dt>사업자등록번호</dt><dd>${esc(c.bizr_no.replace(/(\d{3})(\d{2})(\d{5})/, "$1-$2-$3"))}</dd>
-          <dt>업종 코드</dt><dd>${esc(c.induty_code)}</dd><dt>주소</dt><dd>${esc(c.address)}</dd>
+          <dt>주소</dt><dd>${esc(c.address)}</dd>
           <dt>결산월</dt><dd>${esc(c.acc_mt)}월</dd></dl>
-          <p class="note">출처: DART 기업개황</p></section>
+          </section>
         <section class="card"><h2>${y}년 요약 (별도)</h2><dl class="dl">
           <dt>매출액</dt><dd>${v("revenue")}</dd><dt>영업이익</dt><dd>${v("op_income")}</dd>
           <dt>당기순이익</dt><dd>${v("net_income")}</dd><dt>부채비율</dt><dd>${pct(rt.debtToEquity.value)}</dd>
@@ -515,23 +503,20 @@
       <section class="card scroll"><table class="t num"><tr><th>항목</th>${ys.map((y) => `<th>${y}</th>`).join("")}</tr>
         ${keys.map((k) => `<tr><td>${C.LABELS[k]}</td>${ys.map((y) => { const it = C.item(c, fsScope, y, k);
           return `<td title="${it ? esc(it.src.account_nm + " · 접수번호 " + it.src.rcept_no) : "자료 없음"}">${it ? fmt(it.v) : "-"}</td>`; }).join("")}</tr>`).join("")}
-        <tr class="srcrow"><td>원문</td>${ys.map((y) => `<td>${dartLink(c.financials[fsScope][y].rcept_no, "보기")}</td>`).join("")}</tr></table>
-        <p class="note">${fsScope === "OFS" ? "별도: 대출 신청 법인 자체의 재무제표입니다." : "연결: 종속회사를 포함한 수치입니다. 법인 자체 상환능력과 구분해서 봅니다."} 금액에 마우스를 올리면 원래 계정명과 접수번호가 보입니다.</p></section>`}`;
+        <tr class="srcrow"><td>원문</td>${ys.map((y) => `<td>${dartLink(c.financials[fsScope][y].rcept_no, "보기")}</td>`).join("")}</tr></table></section>`}`;
   }
 
   function coDebt(c) {
     const y = C.latestYear(c, "OFS", ASOF);
     const d = C.call("summarizeDebt", "기업 정보", c, "OFS", y);
     return `
-      <section class="card"><h2>${y}년 말 차입금 구성 (별도) ${fnBadge("summarizeDebt")}</h2>
+      <section class="card"><h2>${y}년 말 차입금 구성 (별도)</h2>
         <table class="t num"><tr><th>계정</th><th>금액</th><th>1년 내 만기</th></tr>
         ${d.parts.map((p) => `<tr><td>${p.label}</td><td>${p.found ? fmt(p.value) : "-"}</td><td>${["st_borrowings", "cur_lt_borrowings", "cur_cb", "cur_lease"].includes(p.key) ? "예" : ""}</td></tr>`).join("")}
-        <tr class="sum"><td>합계</td><td>${fmt(d.total)}</td><td>${fmt(d.dueWithinYear)}</td></tr></table>
-        <p class="note">${esc(d.note)}</p></section>
+        <tr class="sum"><td>합계</td><td>${fmt(d.total)}</td><td>${fmt(d.dueWithinYear)}</td></tr></table></section>
       <section class="card"><h2>전환사채 발행 조건 ${tag("PUBLIC")}</h2>
-        ${c.bonds.length ? `<table class="t"><tr><th>회차</th><th>이사회 결의일</th><th>발행금액</th><th>표면이자율</th><th>만기보장수익률</th><th>만기일</th><th>방식</th><th>원문</th></tr>
-        ${c.bonds.slice().sort((a, b) => +a.seq - +b.seq).map((b) => `<tr><td>${esc(b.seq)}</td><td>${esc(b.board_date)}</td><td>${fmt(b.amount)}</td><td>${esc(b.coupon)}%</td><td>${esc(b.ytm)}%</td><td>${esc(b.maturity)}</td><td>${esc(b.method)}</td><td>${dartLink(b.rcept_no, "보기")}</td></tr>`).join("")}</table>
-        <p class="note">정정 공시가 있는 경우 최종 정정본 조건입니다.</p>` : `<p class="empty">전환사채 발행 공시가 없습니다.</p>`}</section>`;
+        ${c.bonds.length ? `<table class="t"><tr><th>회차</th><th>발행금액</th><th>표면이자율</th><th>만기보장수익률</th><th>만기일</th><th>원문</th></tr>
+        ${c.bonds.slice().sort((a, b) => +a.seq - +b.seq).map((b) => `<tr><td>${esc(b.seq)}</td><td>${fmt(b.amount)}</td><td>${esc(b.coupon)}%</td><td>${esc(b.ytm)}%</td><td>${esc(b.maturity)}</td><td>${dartLink(b.rcept_no, "보기")}</td></tr>`).join("")}</table>` : `<p class="empty">전환사채 발행 공시가 없습니다.</p>`}</section>`;
   }
 
   function coDisc(c) {
@@ -576,144 +561,106 @@
     const rt = C.call("calcRatios", uc, co, "OFS", y);
     const rtPrev = C.call("calcRatios", uc, co, "OFS", String(+y - 1));
     const risk = C.call("riskSignals", uc, co, ASOF);
-    const sp = scenarioParams(c);
-    const sim = C.call("simulateRepayment", uc, co, ASOF, sp);
+    const sim = C.call("simulateRepayment", uc, co, ASOF, scenarioParams(c));
     const ev = eviContext(c, pc.workflow);
-    const loss = ev.loss;
-    const nba = C.call("nextBestAction", uc, risk.prior, ev.actions, loss);
+    const nba = C.call("nextBestAction", uc, risk.prior, ev.actions, ev.loss);
     const loan = c.loanId ? loanById(c.loanId) : null;
     const cov = loan ? C.call("checkCovenants", uc, co, ASOF, loan.covenants) : null;
 
-    const step = (n, title, fns, inner) => `<section id="step-${n}" class="card step"><h2><span class="n">${n}</span>${title}<span class="fns">${fns.map(fnBadge).join("")}</span></h2>${inner}</section>`;
-    const findings = (list) => `<ul class="checks">${list.map((f) => `<li>${levelBadge(f.level)}<div><b>${esc(f.title)}</b><p>${esc(f.detail)} ${(f.refs || []).map((x) => dartLink(x.rcept_no, x.label)).join(" ")}</p></div></li>`).join("")}</ul>`;
+    const step = (n, title, inner) => `<section id="step-${n}" class="card step"><h2><span class="n">${n}</span>${title}</h2>${inner}</section>`;
+    const findings = (list) => `<ul class="checks">${list.map((f) => `<li>${levelBadge(f.level)}<div><b>${esc(f.title)}</b>${f.level === "확인 필요" && f.detail ? `<p>${esc(f.detail)}</p>` : ""}</div></li>`).join("")}</ul>`;
+    const docState = (st) => (["충족", "자동 확보"].includes(st) ? `<span class="st st-ok">${esc(st)}</span>` : st === "해당 없음" ? `<span class="muted">해당 없음</span>` : statusBadge(st));
 
-    // 1. 신청 / 대출 현황
-    const s1 = c.kind === "new" ? step(1, "신청 정보 확인", [], `
+    // 1. 신청 정보
+    const s1 = c.kind === "new" ? step(1, "신청 정보 확인", `
         <dl class="dl cols">
-          <dt>기업</dt><dd><a href="#/company/${co.corp_code}">${esc(co.name)}</a></dd><dt>상품</dt><dd>${esc(c.product)}</dd>
-          <dt>신청 금액</dt><dd>${fmt(c.amount)}</dd><dt>기간·상환</dt><dd>${c.years}년 · ${c.method === "bullet" ? "만기일시상환" : "원금균등분할"}</dd>
-          <dt>제시 금리</dt><dd>연 ${c.rate}%</dd><dt>자금 용도</dt><dd>${esc(c.purpose)}</dd>
-          <dt>신청인</dt><dd>${esc(c.submitter.name)} (${esc(c.submitter.role)})</dd><dt>접수일</dt><dd>${c.submittedAt} · 비대면 접수</dd></dl>
-        <p class="note">${tag("SYN")} 신청 정보는 시연용 가상 데이터입니다.</p>`)
-      : step(1, "대출 현황", ["checkCovenants"], `
+          <dt>상품</dt><dd>${esc(c.product)}</dd><dt>신청 금액</dt><dd>${fmt(c.amount)}</dd>
+          <dt>기간·상환</dt><dd>${c.years}년 · ${c.method === "bullet" ? "만기일시상환" : "원금균등분할"}</dd><dt>금리</dt><dd>연 ${c.rate}%</dd>
+          <dt>자금 용도</dt><dd>${esc(c.purpose)}</dd><dt>신청인</dt><dd>${esc(c.submitter.name)} (${esc(c.submitter.role)})</dd></dl>`)
+      : step(1, "대출 현황", `
         <dl class="dl cols">
-          <dt>기업</dt><dd><a href="#/company/${co.corp_code}">${esc(co.name)}</a></dd><dt>대출</dt><dd><a href="#/loan/${loan.id}">${loan.id}</a> · ${esc(loan.product)}</dd>
-          <dt>잔액</dt><dd>${fmt(loan.balance)}</dd><dt>현재 만기</dt><dd>${loan.maturity}</dd>
-          <dt>연장 요청</dt><dd>${c.years}년 · 연 ${c.rate}%</dd><dt>이자 납부</dt><dd>${loan.repayments.length}회 중 연체 ${loan.repayments.filter((p) => p[3] !== "정상").length}회</dd></dl>
-        <h3>약정 점검</h3><ul class="checks">${cov.map((k) => `<li>${levelBadge(k.ok === true ? "통과" : k.ok === false ? "확인 필요" : "정보")}<div><b>${esc(k.name)}</b><p>${esc(k.text)}</p></div></li>`).join("")}</ul>
-        <p class="note">${tag("SYN")} 대출·상환·약정 정보는 가상 데이터, 재무비율은 DART 공시로 계산했습니다.</p>`);
+          <dt>대출</dt><dd><a href="#/loan/${loan.id}">${loan.id}</a></dd><dt>잔액</dt><dd>${fmt(loan.balance)}</dd>
+          <dt>현재 만기</dt><dd>${loan.maturity}</dd><dt>연장 요청</dt><dd>${c.years}년 · 연 ${c.rate}%</dd>
+          <dt>이자 납입</dt><dd>${loan.repayments.length}회 · 연체 ${loan.repayments.filter((p) => p[3] !== "정상").length}회</dd></dl>
+        ${findings(cov.map((k) => ({ level: k.ok === true ? "통과" : k.ok === false ? "확인 필요" : "정보", title: k.ok === null ? k.name : k.text })))}`);
 
-    // 2. 자료 확인
-    const s2 = step(2, c.kind === "new" ? "심사 절차·필요 자료 확인" : "필요 자료 확인", c.kind === "new" ? ["policyCheck", "checkAuthority", "validateFacts"] : ["policyCheck", "validateFacts"], `
-      ${pc.workflow ? `<h3>심사 온톨로지 적용 절차: ${esc(pc.workflow.product.name)}</h3>
-      <table class="t"><tr><th>심사 업무</th><th>담당</th><th>판단 기준</th><th>상태</th></tr>
+    // 2. 심사 절차·필요 자료
+    const s2 = step(2, c.kind === "new" ? "심사 절차·필요 자료 확인" : "필요 자료 확인", `
+      ${pc.workflow ? `<table class="t"><tr><th>심사 업무</th><th>담당</th><th>상태</th></tr>
         ${pc.workflow.tasks.map((t) => {
-          const st = t.docs.map((d) => (pc.items.find((i) => i.code === d.code) || {}).status);
-          const ok = st.filter((x) => ["충족", "자동 확보", "해당 없음"].includes(x)).length;
-          return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.owner)}</td><td class="small">${esc(t.criteria)}</td>
-            <td>${!t.docs.length ? `<span class="muted">시스템 산출</span>` : ok === t.docs.length ? `<span class="st st-ok">자료 충족</span>` : `<span class="st st-wait">자료 ${ok}/${t.docs.length}</span>`}</td></tr>`;
-        }).join("")}</table>
-      <p class="note">${esc(pc.policyVersion)} · 전결권자 ${esc(pc.workflow.approver)} · <a href="#/workflow">심사 온톨로지</a></p>` : ""}
+          const ok = t.docs.filter((d) => ["충족", "자동 확보", "해당 없음"].includes((pc.items.find((i) => i.code === d.code) || {}).status)).length;
+          return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.owner)}</td>
+            <td>${!t.docs.length ? `<span class="muted">시스템 산출</span>` : ok === t.docs.length ? `<span class="st st-ok">충족</span>` : `<span class="st st-wait">자료 ${ok}/${t.docs.length}</span>`}</td></tr>`;
+        }).join("")}</table>` : ""}
       <h3>필요 자료</h3>
-      <table class="t"><tr><th>자료</th><th>이유</th><th>상태</th><th></th></tr>
-        ${pc.items.map((i) => `<tr><td>${esc(i.name)}</td><td>${esc(i.why)}</td><td>${i.status === "충족" || i.status === "자동 확보" ? `<span class="st st-ok">${esc(i.status)}</span>` : i.status === "해당 없음" ? `<span class="muted">해당 없음</span>` : statusBadge(i.status)}${i.note ? `<div class="note">${esc(i.note)}</div>` : ""}</td>
-          <td>${i.code === "SITE_REPORT" ? `<span class="muted">현장 확인 (은행 담당)</span>` : i.status === "제출됨" ? `<button data-act="ReviewUploadedDocument" data-code="${i.code}">확인 완료</button>` : i.status === "미제출" ? `<button data-act="RequestDocument" data-code="${i.code}" data-name="${esc(i.name)}" data-reason="필수 자료">요청</button>` : ""}</td></tr>`).join("")}</table>
-      ${pc.workflow && pc.workflow.onsite.length ? `<div class="onsite-note"><h3>현장 확인 (온라인 제출 대상 제외)</h3>
-        ${pc.workflow.onsite.map((x) => {
-          const done = c.documents.find((d) => d.code === x.code && d.status === "확인 완료");
-          return `<p><b>${esc(x.name)}</b> · ${done ? "확인 완료 (시연 기록)" : "확인 대기"}</p>
-            ${done ? `<p class="note">${esc(done.note || "")} / ${esc(userName(done.reviewedBy))}</p>` : `<form data-form="onsite" data-code="${x.code}" class="inline"><input name="note" required placeholder="현장 확인 근거"><button type="submit">확인 결과 기록</button></form>`}`;
-        }).join("")}</div>` : ""}
-      ${auth ? `<h3>대표권 확인</h3>${findings(auth.findings)}` : ""}
-      <h3>공시 자료 검증</h3>${findings(checks)}`);
+      <table class="t"><tr><th>자료</th><th>상태</th><th></th></tr>
+        ${pc.items.map((i) => {
+          const site = pc.workflow && pc.workflow.onsite.some((x) => x.code === i.code);
+          const act = site && i.status !== "충족" ? `<form data-form="onsite" data-code="${i.code}" class="inline"><input name="note" required placeholder="현장 확인 결과"><button type="submit">기록</button></form>`
+            : i.status === "제출됨" ? `<button data-act="ReviewUploadedDocument" data-code="${i.code}">확인 완료</button>`
+            : i.status === "미제출" ? `<button data-act="RequestDocument" data-code="${i.code}" data-name="${esc(i.name)}" data-reason="필수 자료">요청</button>` : "";
+          return `<tr><td>${esc(i.name)}${site ? ` <span class="muted small">현장 확인</span>` : ""}</td><td>${docState(i.status)}</td><td>${act}</td></tr>`;
+        }).join("")}</table>
+      <h3>검증 결과</h3>${findings((auth ? auth.findings.filter((f) => f.level !== "정보") : []).concat(checks))}`);
 
-    // 3. 재무 분석
+    // 3. 재무지표
     const row = (label, a, b, f) => `<tr><td>${label}</td><td>${f(b)}</td><td>${f(a)}</td></tr>`;
-    const s3 = step(3, c.kind === "new" ? "재무지표 산출" : "재무 변화", ["calcRatios", "summarizeDebt", "riskSignals"], `
+    const s3 = step(3, c.kind === "new" ? "재무지표 산출" : "재무 변화", `
       <div class="grid2"><div>
-        <table class="t num"><tr><th>지표 (별도)</th><th>${+y - 1}</th><th>${y}</th></tr>
+        <table class="t num"><tr><th>별도 기준</th><th>${+y - 1}</th><th>${y}</th></tr>
           ${row("매출액", C.val(co, "OFS", y, "revenue"), C.val(co, "OFS", String(+y - 1), "revenue"), fmt)}
           ${row("영업이익률", rt.opMargin.value, rtPrev.opMargin.value, (v) => pct(v))}
           ${row("부채비율", rt.debtToEquity.value, rtPrev.debtToEquity.value, (v) => pct(v, 0))}
           ${row("유동비율", rt.currentRatio.value, rtPrev.currentRatio.value, (v) => pct(v, 0))}
           ${row("차입금의존도", rt.debtDependence.value, rtPrev.debtDependence.value, (v) => pct(v))}
-          ${row("영업이익 / 금융원가", rt.coverage.value, rtPrev.coverage.value, times)}
+          ${row("이자보상배율", rt.coverage.value, rtPrev.coverage.value, times)}
           ${row("순차입금", rt.netDebt.value, rtPrev.netDebt.value, fmt)}
-        </table><p class="note">${tag("CALC")} ${esc(rt.notes[0])}</p></div>
-        <div><h3>위험 신호</h3><ul class="plain">${risk.all.map((h) => `<li class="${h.hit ? "hit" : ""}">${h.hit ? "●" : "○"} ${esc(h.text)} (${h.pts}점)</li>`).join("")}</ul>
-          <p>합계 <b>${risk.score}점</b> · 구간 <b>${risk.band}</b> · 사전 부도확률(가정) <b>${pct(risk.prior, 0)}</b></p>
-          <p class="note">${esc(risk.note)}</p></div></div>`);
+        </table></div>
+        <div><h3>위험 신호 ${risk.score}점 · ${risk.band} 구간 · 부도확률 ${pct(risk.prior, 0)}</h3>
+          <ul class="plain">${risk.all.filter((h) => h.hit).map((h) => `<li class="hit">${esc(h.text)} (${h.pts}점)</li>`).join("")}</ul></div></div>`);
 
-    // 4. 상환여력
-    const s4 = step(4, "상환능력 분석", ["simulateRepayment"], `
-      <form class="params" data-form="scenario" data-case="${c.id}">
-        <label>대출금(억)<input name="amount" type="number" step="1" value="${sp.amount / 1e8}"></label>
-        <label>금리(%)<input name="rate" type="number" step="0.1" value="${sp.rate}"></label>
-        <label>기존 차입 금리(%)<input name="existingRate" type="number" step="0.1" value="${sp.existingRate}"></label>
-        <label>1년 내 만기 차환율(%)<input name="refinanceRatio" type="number" step="5" min="0" max="100" value="${sp.refinanceRatio}"></label>
-        <label>매출 변화(%)<input name="salesShock" type="number" step="1" value="${sp.salesShock}"></label>
-        <label>영업이익률 변화(%p)<input name="marginShock" type="number" step="0.5" value="${sp.marginShock}"></label>
-        <label>금리 상승(%p)<input name="rateShock" type="number" step="0.5" value="${sp.rateShock}"></label>
-        <button type="submit">다시 계산</button>
-      </form>
-      <div class="grid2"><div>
-        <table class="t num"><tr><th>시나리오</th><th>상환재원</th><th>1년차 원리금</th><th>최소 DSCR</th><th>신규 대출만</th></tr>
-          ${sim.results.map((s) => `<tr><td>${esc(s.name)}</td><td>${fmt(s.cfads)}</td><td>${fmt(s.rows[0].service)}</td><td class="${s.minDscr < 1 ? "warn-t" : ""}"><b>${isFinite(s.minDscr) ? s.minDscr.toFixed(2) : "-"}</b></td>
-            <td class="${s.minDscrNewOnly < 1 ? "warn-t" : ""}">${isFinite(s.minDscrNewOnly) ? s.minDscrNewOnly.toFixed(2) : "-"}</td></tr>`).join("")}</table>
-        <p class="note">'최소 DSCR'은 기존 차입금 이자와 1년 내 만기분 상환까지 포함한 값, '신규 대출만'은 이번 대출의 원리금만 넣은 값입니다.</p>
-      </div><div>${barChart(sim.results.map((s) => ({ label: s.name, value: isFinite(s.minDscr) ? s.minDscr : 0 })), { fmt: (v) => v.toFixed(2), line: 1, lineLabel: "1.0", width: 420, title: "최소 DSCR", values: true })}
-        <p class="note">DSCR = 상환재원 ÷ (신규·기존 대출 이자 + 해당 연도 원금)</p></div></div>
-      <h3>가정</h3><ul class="plain small">${sim.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>
-      <p class="note">${tag("ASSUME")} ${esc(sim.caution)}</p>`);
+    // 4. 상환능력
+    const s4 = step(4, "상환능력 분석", `
+      ${barChart(sim.results.map((s) => ({ label: s.name, value: isFinite(s.minDscr) ? s.minDscr : 0 })), { fmt: (v) => v.toFixed(2), line: 1, lineLabel: "1.0", width: 520, title: "시나리오별 최소 DSCR (기존 차입금 포함)", values: true })}`);
 
-    // 5. 다음 업무 추천
+    // 5. 추가 확인 항목 선택
     const requested = (name) => c.requests.some((x) => x.name === name);
-    const s5 = step(5, "추가 확인 항목 선택", ["nextBestAction"], `
-      <p>필요 자료는 심사 절차에 따라 모두 확보하며 선택 확인 항목은 순정보가치(기대손실 감소 − 확인 비용)가 큰 항목부터 요청합니다.</p>
-      <p class="small">현재 정보 기준 결정: <b>${nba.now.choice}</b> (기대손실 승인 ${fmt(nba.now.approve, 2)} · 거절 ${fmt(nba.now.reject, 2)})</p>
-      <table class="t num"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th>판단</th><th></th></tr>
-        ${nba.ranked.map((a) => `<tr><td class="l"><b>${esc(a.name)}</b><div class="note">${esc(a.detail)}</div></td><td>${fmt(a.evi, 2)}</td><td>${fmt(a.cost, 2)}</td>
-          <td class="${a.net > 0 ? "ok-t" : "muted"}">${fmt(a.net, 2)}</td><td>${a.recommend ? "<b>권고</b>" : "보류"}</td>
-          <td>${requested(a.name) ? '<span class="muted">요청함</span>' : `<button data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="${a.recommend ? "순정보가치 양수" : "심사역 판단"}" class="${a.recommend ? "" : "ghost"}">요청</button>`}</td></tr>`).join("")}</table>
-      <h3>요청 방식 비교 (동일 가정)</h3>
+    const s5 = step(5, "추가 확인 항목 선택", `
+      <table class="t num"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th></th></tr>
+        ${nba.ranked.map((a) => `<tr><td class="l">${esc(a.name)}</td><td>${fmt(a.evi, 2)}</td><td>${fmt(a.cost, 2)}</td>
+          <td class="${a.net > 0 ? "ok-t" : "muted"}">${fmt(a.net, 2)}</td>
+          <td>${requested(a.name) ? '<span class="muted">요청함</span>' : a.recommend ? `<button data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="순정보가치 양수">요청</button>` : '<span class="muted">보류</span>'}</td></tr>`).join("")}</table>
+      <h3>요청 방식 비교</h3>
       <table class="t num"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
         ${nba.compare.map((x, i) => `<tr class="${i === 2 ? "hlrow" : ""}"><td class="l">${esc(x.name)}</td><td>${x.count.toFixed(2)}</td><td>${fmt(x.cost, 2)}</td><td>${fmt(x.loss, 2)}</td><td><b>${fmt(x.cost + x.loss, 2)}</b></td></tr>`).join("")}</table>
-      <details><summary>계산 방법</summary>
-        <p class="small">사전 부도확률 p = ${pct(nba.prior, 0)} (위험 신호 ${risk.band} 구간). 부도 시 손실 = 대출금 × LGD ${(ev.lgd * 100).toFixed(2).replace(/\.?0+$/, "")}% = ${fmt(loss.approveBad)} (${esc(ev.lgdBasis)}).
-          정상 기업 거절 시 기회손실 = 기대 이자이익 = 대출금 × (대출 금리 − 자금조달금리 ${SEED.eviAssumptions.fundingRate}%) × ${c.years}년 = ${fmt(loss.rejectGood)}.</p>
-        <p class="small">확인 비용 = 고객 이탈률 × 기대 이자이익 + 처리비용. 확인 결과(우려·양호)는 민감도·특이도에 따라 발생하며 베이즈 정리로 부도확률을 갱신합니다.
-          정보가치 = 현재 기대손실 − 확인 결과 반영 후 기대손실. 산식과 가정값의 근거는 <a href="#/basis">산정 기준</a>에 있습니다.</p>
-        </details>
-      <p class="note">${tag("ASSUME")} ${esc(nba.note)}</p>`);
+      <p class="note"><a href="#/basis">산정 기준</a></p>`);
 
-    // 6. 요청 자료와 처리
+    // 6. 추가 자료 요청·승인
     const canDecide = u.canApprove > 0;
-    const s6 = step(6, "추가 자료 요청·승인", [], `
-      ${c.requests.length ? `<table class="t"><tr><th>번호</th><th>자료</th><th>사유</th><th>요청</th><th>상태</th><th>파일</th><th></th></tr>
-        ${c.requests.map((q) => `<tr><td>${q.id}</td><td>${esc(q.name)}</td><td>${esc(q.reason)}</td><td>${esc(q.requestedAt)}</td><td>${statusBadge(q.status)}</td><td>${esc(q.file || "-")}</td>
-          <td>${q.status === "제출됨" ? `<button data-act="ReviewDocument" data-req="${q.id}" data-result="확인 완료">확인 완료</button> <button class="ghost" data-act="ReviewDocument" data-req="${q.id}" data-result="보완 요청">보완 요청</button>` : ""}</td></tr>`).join("")}</table>
-        <p class="note">요청한 자료는 고객 화면에 바로 나타납니다. 상단에서 사용자를 '최민수 · 다산솔루에타 재무팀장'으로 바꾸면 확인할 수 있습니다.</p>` : `<p class="empty">요청한 자료가 없습니다.</p>`}
+    const s6 = step(6, "추가 자료 요청·승인", `
+      ${c.requests.length ? `<table class="t"><tr><th>자료</th><th>상태</th><th></th></tr>
+        ${c.requests.map((q) => `<tr><td>${esc(q.name)}</td><td>${statusBadge(q.status)}</td>
+          <td>${q.status === "제출됨" ? `<button data-act="ReviewDocument" data-req="${q.id}" data-result="확인 완료">확인 완료</button> <button class="ghost" data-act="ReviewDocument" data-req="${q.id}" data-result="보완 요청">보완 요청</button>` : ""}</td></tr>`).join("")}</table>` : ""}
       <div class="grid2">
         <div><h3>심사 의견</h3>
-          ${c.opinions.map((o) => `<div class="op"><b>${esc(userName(o.by))}</b> · ${o.at} · ${esc(o.recommendation)}<p>${esc(o.text)}</p></div>`).join("") || `<p class="empty">아직 없습니다.</p>`}
-          ${!c.decision ? `<form data-form="opinion"><textarea name="text" rows="3" placeholder="판단 근거를 적어 주세요."></textarea>
+          ${c.opinions.map((o) => `<div class="op"><b>${esc(userName(o.by))}</b> · ${esc(o.recommendation)}<p>${esc(o.text)}</p></div>`).join("")}
+          ${!c.decision ? `<form data-form="opinion"><textarea name="text" rows="3" placeholder="판단 근거"></textarea>
             <select name="recommendation"><option>승인 의견</option><option>조건부 승인 의견</option><option>거절 의견</option></select>
             <button type="submit">의견 기록</button></form>` : ""}</div>
-        <div><h3>결정</h3>
-          ${c.decision ? `<p>${statusBadge(c.decision.decision)} ${esc(userName(c.decision.by))} · ${c.decision.at}</p><p>${esc(c.decision.comment)}</p>`
-            : `<p>결정 권한: <b>${esc(pc.approver)}</b> (${fmt(c.amount)})</p>
-               ${!pc.complete ? `<p class="warn-t">필수 자료 미충족: ${pc.missing.map((m) => esc(m.name)).join(", ")}</p>` : ""}
-               ${canDecide ? `<form data-form="decision"><input name="comment" placeholder="결정 사유 (선택)">
+        <div><h3>결정 · ${esc(pc.approver)}</h3>
+          ${c.decision ? `<p>${statusBadge(c.decision.decision)} ${esc(userName(c.decision.by))}</p>`
+            : `${!pc.complete ? `<p class="warn-t">미충족: ${pc.missing.map((m) => esc(m.name)).join(", ")}</p>` : ""}
+               ${canDecide ? `<form data-form="decision"><input name="comment" placeholder="결정 사유">
                  <div class="btns"><button type="submit" name="decision" value="승인">승인</button><button type="submit" name="decision" value="조건부 승인">조건부 승인</button><button type="submit" class="danger" name="decision" value="거절">거절</button></div></form>`
-               : `<p class="muted">결정은 승인 권한이 있는 사용자만 할 수 있습니다. 상단에서 '이준호 · 심사팀장'으로 바꿔 진행하세요.</p>`}`}
+               : `<p class="muted">전결권자 계정(이준호)에서 결정</p>`}`}
         </div></div>`);
 
     // 진행 단계
     const pending = c.requests.filter((q) => q.status === "요청됨" || q.status === "제출됨" || q.status === "보완 요청").length;
     const stages = [
       ["접수", true, c.submittedAt],
-      ["자료 확인", pc.complete && !pending, pc.complete && !pending ? "완료" : `필수 ${pc.items.filter((i) => ["충족", "자동 확보", "해당 없음", "확인 완료"].includes(i.status)).length}/${pc.items.length}`],
-      ["분석·추천", true, `확인 필요 ${checks.filter((f) => f.level === "확인 필요").length}건`],
+      ["자료 확인", pc.complete && !pending, pc.complete && !pending ? "완료" : `${pc.items.filter((i) => ["충족", "자동 확보", "해당 없음"].includes(i.status)).length}/${pc.items.length}`],
+      ["분석", true, `확인 필요 ${checks.filter((f) => f.level === "확인 필요").length}건`],
       ["심사 의견", c.opinions.length > 0, c.opinions.length ? c.opinions[c.opinions.length - 1].recommendation : "작성 전"],
       ["결정", !!c.decision, c.decision ? c.decision.decision : pc.approver],
     ];
@@ -721,41 +668,29 @@
     const stepper = `<ol class="stepper keep">${stages.map((x, i) => `<li class="${x[1] ? "done" : i === curIdx ? "cur" : ""}"><span class="dot">${x[1] ? "✓" : i + 1}</span><div><b>${x[0]}</b><small>${esc(x[2])}</small></div></li>`).join("")}</ol>`;
     const base = sim.results[0];
     const top = nba.ranked.find((a) => a.recommend);
-    const recent = S.audit.filter((a) => a.summary.startsWith(c.id) || (c.loanId && a.summary.startsWith(c.loanId))).slice(0, 4);
     const side = `<aside class="case-side">
         <div class="card side-card">
-          <div class="side-co"><span class="co-mark">${esc(co.name.replace(/\(주\)|㈜/g, "").slice(0, 1))}</span><div><b>${esc(co.name)}</b><small>${esc(co.market)} ${esc(co.stock_code)} · 대표 ${esc(co.ceo)}</small></div></div>
-          <dl class="side-dl">
-            <dt>${c.kind === "new" ? "신청 금액" : "연장 금액"}</dt><dd><b>${fmt(c.amount)}</b></dd>
-            <dt>기간·금리</dt><dd>${c.years}년 · 연 ${c.rate}%</dd>
-            <dt>담당</dt><dd>${esc(userName(c.assignee))}</dd>
-            <dt>결정 권한</dt><dd>${esc(pc.approver)}</dd>
-          </dl>
           <div class="side-metrics">
             <div><small>위험 신호</small><b class="band band-${risk.band}">${risk.band}</b><span>${risk.score}점</span></div>
-            <div><small>최소 DSCR</small><b class="${base.minDscr < 1 ? "warn-t" : ""}">${isFinite(base.minDscr) ? base.minDscr.toFixed(2) : "-"}</b><span>기본 시나리오</span></div>
-            <div><small>확인 필요</small><b>${checks.filter((f) => f.level === "확인 필요").length}</b><span>공시 검증</span></div>
+            <div><small>최소 DSCR</small><b class="${base.minDscr < 1 ? "warn-t" : ""}">${isFinite(base.minDscr) ? base.minDscr.toFixed(2) : "-"}</b><span>기본</span></div>
+            <div><small>확인 필요</small><b>${checks.filter((f) => f.level === "확인 필요").length}</b><span>검증</span></div>
           </div>
-          ${top ? `<div class="side-reco"><small>요청 항목 (순정보가치 기준)</small><b>${esc(top.name)}</b><span>순정보가치 ${fmt(top.net, 2)}</span></div>` : ""}
+          ${top ? `<div class="side-reco"><small>요청 권고</small><b>${esc(top.name)}</b></div>` : ""}
         </div>
-        <div class="card side-card"><h3>최근 처리</h3>${recent.length ? `<ul class="side-log">${recent.map((a) => `<li><b>${esc(a.label)}</b><span>${esc(userName(a.by))}</span><small>${a.at.slice(11)}</small></li>`).join("")}</ul>` : `<p class="empty">아직 처리 기록이 없습니다.</p>`}</div>
-        <a href="#/packages" class="side-pkg">${icon("packages")}<span>${uc}에 쓰인 공통 기능</span></a>
       </aside>`;
     return `
-      <div class="page-head keep"><div><h1>${c.id} <span class="h1-co">${esc(co.name)}</span></h1>
-        <p class="sub">${c.kind === "new" ? "신규 여신 심사" : "만기연장 심사"} · ${statusBadge(c.status)} · 접수 ${c.submittedAt}${c.demoCase ? " · 상품 비교용 가상 신청" : ""}</p></div>
-        <div class="head-actions"><a class="btn-ghost" href="#/company/${co.corp_code}">기업 정보</a>${c.loanId ? `<a class="btn-ghost" href="#/loan/${c.loanId}">대출 정보</a>` : ""}</div></div>
+      <div class="page-head keep"><div><h1>${c.id} <span class="h1-co"><a href="#/company/${co.corp_code}">${esc(co.name)}</a></span></h1>
+        <p class="sub">${c.kind === "new" ? "신규 심사" : "만기연장 심사"} · ${statusBadge(c.status)} · 비대면 접수 ${c.submittedAt}</p></div></div>
       ${stepper}
       <div class="case-layout"><div class="case-main">
-      ${s1}${s2}${s3}${s4}${s5}${s6}
-      <section class="card"><h2>이 건의 처리 기록</h2>${auditTable(S.audit.filter((a) => a.summary.startsWith(c.id) || (c.loanId && a.summary.startsWith(c.loanId))))}</section>
+        ${s1}${s2}${s3}${s4}${s5}${s6}
       </div>${side}</div>`;
   }
 
   // ------------------------------------------------------------ 여신 관리
   function pageLoans() {
-    return `<h1>여신 관리</h1><p class="sub">${tag("SYN")} 실행된 대출은 가상 데이터입니다.</p>
-      <section class="card"><table class="t"><tr><th>대출</th><th>기업</th><th>상품</th><th>잔액</th><th>금리</th><th>만기</th><th>연장</th></tr>
+    return `<h1>실행 여신</h1>
+      <section class="card"><table class="t"><tr><th>대출</th><th>기업</th><th>상품</th><th>잔액</th><th>금리</th><th>만기</th><th>만기연장</th></tr>
       ${S.loans.map((l) => `<tr><td><a href="#/loan/${l.id}">${l.id}</a></td><td>${esc(company(l.corp_code).name)}</td><td>${esc(l.product)}</td><td>${fmt(l.balance)}</td><td>${l.rate}%</td><td>${l.maturity}</td><td>${esc(l.renewal.status)}</td></tr>`).join("")}</table></section>`;
   }
 
@@ -767,24 +702,21 @@
     const cov = C.call("checkCovenants", "만기연장 심사", co, ASOF, l.covenants);
     const evs = monitorEvents().filter((e) => e.loans.includes(l.id));
     const dleft = Math.round(C.monthsBetween(ASOF, l.maturity) * 30);
+    const late = l.repayments.filter((p) => p[3] !== "정상").length;
     return `
-      <h1>${l.id} · ${esc(co.name)}</h1><p class="sub">${esc(l.product)} · ${tag("SYN")}</p>
+      <h1>${l.id} <span class="h1-co">${esc(co.name)}</span></h1><p class="sub">${esc(l.product)}</p>
       <div class="grid4">
         <div class="kpi"><div class="k">잔액</div><div class="v">${fmt(l.balance)}</div></div>
         <div class="kpi"><div class="k">금리</div><div class="v">${l.rate}%</div></div>
-        <div class="kpi"><div class="k">만기</div><div class="v">${l.maturity}</div><div class="k">${dleft >= 0 ? "D-" + dleft : "만기 경과"}</div></div>
-        <div class="kpi"><div class="k">만기연장</div><div class="v small">${esc(l.renewal.status)}</div></div>
+        <div class="kpi"><div class="k">만기</div><div class="v small">${l.maturity} (${dleft >= 0 ? "D-" + dleft : "경과"})</div></div>
+        <div class="kpi"><div class="k">이자 납입</div><div class="v small">${l.repayments.length}회 · 연체 ${late}회</div></div>
       </div>
-      <section class="card"><h2>만기연장</h2>
-        ${rc ? `<p>연장 심사 <a href="#/case/${rc.id}">${rc.id}</a> ${statusBadge(rc.status)}</p>`
-          : `<p>만기 60일 전부터 연장 심사를 시작할 수 있습니다. 신규 심사에서 쓴 재무 분석·검증·시나리오 기능을 그대로 사용합니다.</p>
-             <button data-act="StartRenewalReview" data-loan="${l.id}">만기연장 심사 시작</button>`}</section>
       <div class="grid2">
-        <section class="card"><h2>약정 점검 ${fnBadge("checkCovenants")}</h2><ul class="checks">${cov.map((k) => `<li>${levelBadge(k.ok === true ? "통과" : k.ok === false ? "확인 필요" : "정보")}<div><b>${esc(k.name)}</b><p>${esc(k.text)}</p></div></li>`).join("")}</ul></section>
-        <section class="card"><h2>상환 이력</h2><table class="t small"><tr><th>일자</th><th>구분</th><th>금액</th><th>상태</th></tr>
-          ${l.repayments.slice().reverse().map((p) => `<tr><td>${p[0]}</td><td>${p[1]}</td><td>${Math.round(p[2] / 1e4).toLocaleString("ko-KR")}만원</td><td>${p[3]}</td></tr>`).join("")}</table></section>
+        <section class="card"><h2>만기연장</h2>
+          ${rc ? `<p><a href="#/case/${rc.id}">${rc.id}</a> ${statusBadge(rc.status)}</p>` : `<button data-act="StartRenewalReview" data-loan="${l.id}">만기연장 심사 시작</button>`}</section>
+        <section class="card"><h2>약정 점검</h2><ul class="checks">${cov.map((k) => `<li>${levelBadge(k.ok === true ? "통과" : k.ok === false ? "확인 필요" : "정보")}<div><b>${esc(k.ok === null ? k.name : k.text)}</b></div></li>`).join("")}</ul></section>
       </div>
-      <section class="card"><h2>대출 실행 이후 공시 사건 ${fnBadge("detectMonitoringEvents")}</h2>${eventTable(evs)}</section>`;
+      <section class="card"><h2>대출 실행 이후 공시 사건</h2>${eventTable(evs)}</section>`;
   }
 
   // ------------------------------------------------------------ 사후 모니터링
@@ -800,48 +732,48 @@
     return out;
   }
 
+  // 중요도 '검토' 이상만 표시
   function eventTable(evs) {
-    if (!evs.length) return `<p class="empty">사건이 없습니다.</p>`;
-    return `<table class="t"><tr><th>일자</th><th>중요도</th><th>분류</th><th>내용</th><th>연결 대출</th><th>처리</th></tr>
+    evs = evs.filter((e) => e.severity !== "참고");
+    if (!evs.length) return `<p class="empty">검토 대상 사건이 없습니다.</p>`;
+    return `<table class="t"><tr><th>일자</th><th>중요도</th><th>내용</th><th>대출</th><th>처리</th></tr>
       ${evs.map((e) => { const s = S.events[e.key];
-        return `<tr><td>${d8(e.date)}</td><td>${levelBadge(e.severity)}</td><td>${esc(e.category)}</td><td>${esc(e.title)} ${dartLink(e.rcept_no, "원문")}</td>
+        return `<tr><td>${d8(e.date)}</td><td>${levelBadge(e.severity)}</td><td>${esc(e.title)} ${dartLink(e.rcept_no, "원문")}</td>
         <td>${e.loans.map((x) => `<a href="#/loan/${x}">${x}</a>`).join(", ")}</td>
-        <td>${!s ? (e.severity === "참고" ? `<span class="muted">참고</span>` : `<button data-act="CreateMonitoringTask" data-key="${esc(e.key)}" data-title="${esc(e.title)}" data-loanid="${e.loans[0]}">검토 업무 생성</button>`)
-          : s.status === "종결" ? `<span class="muted">종결: ${esc(s.note)}</span>`
-          : `${statusBadge("진행 중")} ${s.taskId} <form class="inline" data-form="close" data-key="${esc(e.key)}" data-title="${esc(e.title)}"><input name="note" placeholder="종결 사유" required><button type="submit" class="ghost small">종결</button></form>`}</td></tr>`; }).join("")}</table>`;
+        <td>${!s ? `<button data-act="CreateMonitoringTask" data-key="${esc(e.key)}" data-title="${esc(e.title)}" data-loanid="${e.loans[0]}">검토 업무 생성</button>`
+          : s.status === "종결" ? `<span class="muted">종결</span>`
+          : `<form class="inline" data-form="close" data-key="${esc(e.key)}" data-title="${esc(e.title)}"><input name="note" placeholder="종결 사유" required><button type="submit" class="ghost small">종결</button></form>`}</td></tr>`; }).join("")}</table>`;
   }
 
   function pageMonitor() {
-    const evs = monitorEvents();
     return `<h1>사후 모니터링</h1>
-      <p class="sub">대출 실행 기업에 새 공시가 나오거나 사채 만기가 오면 해당 대출과 연결해 보여줍니다. 중요도가 '검토' 이상이면 담당자 검토 업무를 만들 수 있습니다.</p>
-      <section class="card">${eventTable(evs)}
-      <p class="note">중요도는 공시 분류별 규칙입니다 (차입·사채·보증·최대주주·소송: 검토, 관리종목·거래정지: 긴급, 그 외: 참고). 공시 외의 은행 내부 정보(연체, 거래 변화)는 PoC 범위에 없습니다.</p></section>`;
+      <p class="sub">대출 실행 이후 공시·사채 만기 중 검토 대상</p>
+      <section class="card">${eventTable(monitorEvents())}</section>`;
   }
 
   // ------------------------------------------------------------ 심사 온톨로지
   const workflowSelection = { productId: "working", applicant: "proxy", companyType: "listed", amountEok: 30, taskId: "AUTH" };
   const FN_LABEL = {
     checkAuthority: "대표권 확인", validateFacts: "공시 자료 검증", calcRatios: "재무비율 산출", summarizeDebt: "차입금 집계",
-    simulateRepayment: "상환여력 시나리오", riskSignals: "위험 신호", nextBestAction: "정보가치 계산",
+    simulateRepayment: "상환능력 시나리오", riskSignals: "위험 신호", nextBestAction: "정보가치 계산",
   };
 
   function ontologyHub(task, wf) {
     const list = (arr) => arr.length ? `<ul>${arr.join("")}</ul>` : `<p class="muted">없음</p>`;
-    const node = (side, label, body) => `<div class="onto-node ${side}"><small>${label}</small>${body}</div>`;
+    const node = (pos, label, body) => `<div class="onto-node ${pos}"><small>${label}</small>${body}</div>`;
     const docs = list(task.docs.filter((d) => !task.extra.some((x) => x.doc.code === d.code))
       .map((d) => `<li><b>${esc(d.name)}</b><span>${esc(d.channel)}</span></li>`)
-      .concat(task.refs.map((x) => `<li><b>${esc(x)}</b><span>자동 조회</span></li>`)));
-    const extra = list(task.extra.map((x) => `<li><b>${esc(x.doc.name)}</b><span>${esc(x.text)} · ${x.applied ? "현재 조건 적용" : "현재 조건 미적용"}</span></li>`));
+      .concat(task.refs.map((x) => `<li><b>${esc(x.replace(/\s*\(.*\)$/, ""))}</b><span>자동 조회</span></li>`)));
+    const extra = list(task.extra.map((x) => `<li><b>${esc(x.doc.name)}</b><span>대리 신청 시${x.applied ? " · 적용" : ""}</span></li>`));
     const fns = list(task.fns.map((f) => `<li><b>${esc(FN_LABEL[f] || f)}</b></li>`));
     return `<div class="onto-hub">
       ${node("l1", "필요 자료·제출 방식", docs)}
       ${node("l2", "추가 요청 자료", extra)}
-      ${node("l3", "처리·심사 담당", `<p><b>${esc(task.owner)}</b></p>`)}
+      ${node("l3", "담당", `<p><b>${esc(task.owner)}</b></p>`)}
       <div class="onto-center"><small>심사 업무</small><b>${esc(task.name)}</b><span>${esc(wf.product.name)}</span></div>
       ${node("r1", "판단 기준", `<p>${esc(task.criteria)}</p>`)}
-      ${node("r2", "시스템 지원 기능", fns)}
-      ${node("r3", "최종 승인", `<p><b>${esc(task.approver)}</b></p><span class="muted small">신청 금액 기준 전결권자</span>`)}
+      ${node("r2", "시스템 지원", fns)}
+      ${node("r3", "최종 승인", `<p><b>${esc(task.approver)}</b></p><span class="muted small">신청 금액 기준</span>`)}
     </div>`;
   }
 
@@ -854,21 +786,18 @@
     const compare = ont.products.map((p) => ({ p, wf: C.call("compileWorkflow", "심사 온톨로지", { ...ctx, productId: p.id }, ont) }));
     const opt = (v, cur, label) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${label}</option>`;
     return `<h1>심사 온톨로지</h1>
-      <p class="sub">심사 업무별 필요 자료·제출 방식·담당·판단 기준·전결권자의 연결 구조와 조건별 심사 절차 구성</p>
-      <section class="card"><h2>심사 조건</h2>
+      <section class="card">
         <form data-form="workflow" class="workflow-controls">
           <label>대출 상품<select name="productId">${ont.products.map((p) => opt(p.id, sel.productId, esc(p.name))).join("")}</select></label>
-          <label>신청인<select name="applicant">${opt("proxy", sel.applicant, "대리 신청 (재무팀장)")}${opt("representative", sel.applicant, "대표이사 신청")}</select></label>
-          <label>기업 정보<select name="companyType">${opt("listed", sel.companyType, "상장기업 (DART 공시)")}${opt("unlisted", sel.companyType, "비상장·공시 부족")}</select></label>
+          <label>신청인<select name="applicant">${opt("proxy", sel.applicant, "대리 신청")}${opt("representative", sel.applicant, "대표이사 신청")}</select></label>
+          <label>기업 정보<select name="companyType">${opt("listed", sel.companyType, "상장 (DART 공시)")}${opt("unlisted", sel.companyType, "비상장·공시 부족")}</select></label>
           <label>신청 금액<select name="amountEok">${[10, 30, 50].map((x) => opt(x, sel.amountEok, x + "억 원")).join("")}</select></label>
           <button type="submit">절차 구성</button>
         </form>
-        <p class="note">${tag("SYN")} 심사 업무·판단 기준·현장 확인 여부는 가상은행 내규이며 실제 은행 내규나 법적 기준이 아닙니다.</p>
       </section>
-      <section class="card"><h2>심사 업무 구성: ${esc(task.name)}</h2>
+      <section class="card"><h2>심사 업무 구성</h2>
         <div class="seg wrap">${wf.tasks.map((t) => `<button type="button" data-otask="${t.id}" class="${t.id === task.id ? "on" : ""}">${esc(t.name)}</button>`).join("")}</div>
         ${ontologyHub(task, wf)}
-        <p class="note">기업·상품이 달라져도 각 심사 업무는 동일한 구조로 정의되며 조건에 따라 추가 요청 자료와 전결권자가 달라집니다.</p>
       </section>
       <div class="grid4">
         <div class="kpi"><div class="k">심사 업무</div><div class="v">${wf.tasks.length}개</div></div>
@@ -876,26 +805,18 @@
         <div class="kpi"><div class="k">현장 확인</div><div class="v">${wf.onsite.length}개</div></div>
         <div class="kpi"><div class="k">전결권자</div><div class="v small">${esc(wf.approver)}</div></div>
       </div>
-      <section class="card"><h2>심사 절차: ${esc(wf.product.name)}</h2>
-        <div class="workflow-rules">${wf.reasons.map((x) => `<div>${esc(x)}</div>`).join("")}</div>
-        <table class="t"><tr><th>심사 업무</th><th>필요 자료·제출 방식</th><th>담당</th><th>판단 기준</th></tr>
-          ${wf.tasks.map((t) => `<tr class="${t.docs.some((d) => d.type === "onsite") ? "field-row" : ""}"><td><b>${esc(t.name)}</b></td>
-            <td>${t.docs.length ? t.docs.map((d) => `${esc(d.name)}<div class="note">${esc(d.channel)}</div>`).join("") : `<span class="muted">시스템 산출</span>`}</td>
-            <td>${esc(t.owner)}</td><td class="small">${esc(t.criteria)}</td></tr>`).join("")}</table>
-        ${sel.companyType === "listed" ? `<div class="btns"><button data-act="CreateCaseFromWorkflow" data-productid="${sel.productId}" data-applicant="${sel.applicant}" data-amount="${sel.amountEok}">이 조건으로 심사 건 생성</button></div>
-          <p class="note">다산솔루에타 공시 정보를 사용하는 가상 신청 건을 추가하고 심사 화면으로 이동합니다. 기존 신청 건은 변경되지 않습니다.</p>`
-          : `<p class="note warn-t">비상장기업은 재무 데이터가 없어 절차 구성만 시연합니다.</p>`}
-      </section>
-      <section class="card"><h2>상품별 비교</h2><p class="small">동일 기업·신청인 조건에서 공통 심사 업무는 유지되고 상품별 업무만 추가됩니다.</p>
+      <section class="card"><h2>상품별 심사 절차</h2>
         <div class="grid3">${compare.map(({ p, wf: w }) => `<div class="workflow-product ${p.id === sel.productId ? "selected" : ""}"><h3>${esc(p.name)}</h3>
-          <p class="small">업무 ${w.tasks.length}개 · 자료 ${w.checks.length}개 · 현장 확인 ${w.onsite.length}개</p>
           <ul class="plain small">${w.tasks.map((t) => `<li><b>${esc(t.name)}</b>${t.docs.length ? `<div class="muted">${t.docs.map((d) => esc(d.name)).join(", ")}</div>` : ""}</li>`).join("")}</ul></div>`).join("")}</div>
+        ${sel.companyType === "listed" ? `<div class="btns"><button data-act="CreateCaseFromWorkflow" data-productid="${sel.productId}" data-applicant="${sel.applicant}" data-amount="${sel.amountEok}">이 조건으로 심사 건 생성</button></div>`
+          : `<p class="note">비상장기업은 재무 데이터가 없어 절차 구성만 시연</p>`}
       </section>
-      <p class="note">심사 업무와 상품별 규칙을 데이터로 정의하고 조건에 따라 절차를 구성하는 시연입니다. 실제 은행 시스템 연계와 법규 검증은 범위에 포함하지 않습니다.</p>`;
+      <p class="note">${tag("SYN")} 상품별 심사 업무와 전결 한도는 가상은행 내규</p>`;
   }
 
   // ------------------------------------------------------------ 산정 기준
-  // 확인 비용·기대손실의 산정 방식, 데이터 항목, 판단 기준과 근거. 수치는 실제 계산에 쓰는 정의에서 읽는다.
+  // 정보가치 계산의 손실·비용. 부도 시 손실 = 대출금 × LGD(상품별), 기회손실 = 기대 이자이익,
+  // 확인 비용 = 고객 이탈률 × 기대 이자이익 + 처리비용.
   function eviContext(c, wf) {
     const ea = SEED.eviAssumptions;
     const pol = c.kind === "renewal" ? SEED.renewalPolicy : (wf ? wf.product : SEED.processOntology.products[0]);
@@ -904,198 +825,102 @@
       const a = ea.actions[id];
       return { id, ...a, cost: a.dropout * margin + a.handling };
     });
-    return { lgd: pol.lgd, lgdBasis: pol.lgdBasis, margin, actions, loss: { approveBad: c.amount * pol.lgd, rejectGood: margin } };
+    return { lgd: pol.lgd, margin, actions, loss: { approveBad: c.amount * pol.lgd, rejectGood: margin } };
   }
 
   function pageBasis() {
     const ont = SEED.processOntology;
     const ea = SEED.eviAssumptions;
     const meta = C.meta;
-    const app = SEED.applications[0];
-    const ex = eviContext({ ...app, kind: "new" }, null);
-    const ln = SEED.loans[0];
-    const exR = eviContext({ kind: "renewal", amount: ln.balance, rate: ln.renewal.requestedRate, years: ln.renewal.requestedYears }, null);
     const sd = SEED.scenarioDefaults;
+    const A = tag("ASSUME");
+    const B = `<span class="tag t-public">공식 기준</span>`;
     const tbl = (head, rows) => `<table class="t"><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${rows.map((r) => `<tr>${r.map((x) => `<td>${x}</td>`).join("")}</tr>`).join("")}</table>`;
+    const lgdTxt = (v) => (v * 100).toFixed(Math.round(v * 1e4) % 100 ? 2 : 0) + "%";
     const man = (v) => {
       const e = Math.floor(v / 1e8), m = Math.round((v - e * 1e8) / 1e4);
       return (e ? e.toLocaleString("ko-KR") + "억" + (m ? " " : "") : "") + (m || !e ? m.toLocaleString("ko-KR") + "만" : "") + " 원";
     };
-    const lgdTxt = (v) => (v * 100).toFixed(Math.round(v * 1e4) % 100 ? 2 : 0) + "%";
-    const kind = { 공시: tag("PUBLIC"), 계산: tag("CALC"), 가정: tag("ASSUME"), 가상: tag("SYN"), 기준: `<span class="tag t-public">공식 기준</span>` };
-
-    // 계정 매핑: 실제 데이터에 들어 있는 계정명·표준계정코드
-    const acc = {};
-    Object.values(DATA.companies).forEach((co) => ["OFS", "CFS"].forEach((sc) => Object.values(co.financials[sc] || {}).forEach((st) =>
-      Object.entries(st.items).forEach(([k, it]) => {
-        if (!C.LABELS[k]) return;
-        (acc[k] = acc[k] || new Set()).add(`${it.src.account_nm} · ${it.src.account_id === "-표준계정코드 미사용-" ? "표준계정코드 미사용(계정명 기준)" : it.src.account_id}`);
-      }))));
-    const sjOf = (k) => ["revenue", "op_income", "net_income", "finance_costs"].includes(k) ? "포괄손익계산서" : k === "op_cf" ? "현금흐름표" : "재무상태표";
-
-    const bandRows = meta.BANDS.map((b, i) => {
+    const bands = meta.BANDS.map((b, i) => {
       const lo = i ? meta.BANDS[i - 1].max + 1 : 0;
-      return [b.band, i === meta.BANDS.length - 1 ? `${lo}점 이상` : lo === b.max ? `${lo}점` : `${lo}~${b.max}점`, pct(b.p, 0)];
-    });
-    const ruleBasis = {
-      op_loss: "최근 3년 내 영업손실 발생, 수익성 악화",
-      coverage: "영업이익으로 이자비용 미충당. 한국은행은 3년 연속 이자보상배율 1 미만 기업을 한계기업으로 분류",
-      short_debt: "1년 내 상환 부담이 단기 상환재원을 초과하는 유동성 위험",
-      lev: "국내 여신 실무에서 통상 사용하는 부채비율 관리 기준(200%)",
-      cash_burn: "영업활동으로 현금 미창출",
-      sales_drop: "매출 감소에 따른 상환재원 축소",
-    };
-    const sevBasis = { 긴급: "상장 유지·거래 가능성에 직접 영향", 검토: "채무 부담, 담보 제공, 지배구조 변화, 법적 분쟁 등 상환능력에 영향", 참고: "자본 구조·정기 공시 등 직접 영향이 작은 사항" };
-    const sevGroups = ["긴급", "검토", "참고"].map((lv) => [lv, Object.keys(meta.EVENT_SEVERITY).filter((k) => meta.EVENT_SEVERITY[k] === lv).join(", "), sevBasis[lv]]);
-    const productsOf = (id) => ont.products.filter((p) => p.optional.includes(id)).map((p) => p.name.replace(" (가상)", "")).concat(SEED.renewalPolicy.optional.includes(id) ? ["만기연장"] : []).join(", ");
+      return `${b.band} ${i === meta.BANDS.length - 1 ? `${lo}점 이상` : lo === b.max ? `${lo}점` : `${lo}~${b.max}점`} ${pct(b.p, 0)}`;
+    }).join(" · ");
+    const sev = (lv) => Object.keys(meta.EVENT_SEVERITY).filter((k) => meta.EVENT_SEVERITY[k] === lv).join(", ");
 
     return `<h1>산정 기준</h1>
-      <p class="sub">PoC에 사용한 데이터 항목, 계산식, 판단 기준과 가정값의 근거</p>
-      <section class="card"><h2>구분 표시</h2>
-        ${tbl(["표시", "의미"], [
-          [kind.공시, "OpenDART에서 수집한 실제 공시 값"],
-          [kind.기준, "법령·회계기준·감독기준 등 공개된 기준"],
-          [kind.계산, "공시 값에 산식을 적용한 결과"],
-          [kind.가정, "시연을 위해 설정한 값. 실제 운영 시 은행 내부 데이터로 추정 필요"],
-          [kind.가상, "은행 내부 정보를 대신하는 가상 데이터"],
+      <p class="sub">${A} 은행 내부 데이터로 추정이 필요한 시연용 값 · ${B} 법령·회계기준·감독기준</p>
+
+      <section class="card"><h2>데이터</h2>
+        ${tbl(["항목", "내용"], [
+          ["공시 정보", `DART 기업개황·재무제표·공시 목록·전환사채 발행결정·감사의견·임원 현황 (${Object.values(DATA.companies).map((x) => esc(x.name)).join(", ")}, 2015~2025 사업연도)`],
+          ["가상 데이터", "은행, 사용자, 대출 신청, 실행 여신, 내규"],
+          ["정보 시점", `기준일(${SEED.asOf}) 이전 공시만 사용`],
+          ["기준 재무제표", "별도재무제표 (대출 신청 법인 자체의 상환능력)"],
         ])}</section>
 
-      <section class="card"><h2>데이터 출처와 사용 항목</h2>
-        <h3>공시 정보 (OpenDART 공시정보 API)</h3>
-        ${tbl(["데이터", "API", "사용 항목", "사용 기능"], [
-          ["기업개황", "기업개황", "회사명, 대표자명, 법인등록번호, 사업자등록번호, 업종코드, 설립일, 결산월", "기업 정보, 대표권 확인"],
-          ["재무제표", "단일회사 전체 재무제표 (별도·연결)", "아래 계정, 접수번호, 공시일, 다음 연도 보고서의 전기 비교표시 금액", "재무지표 산출, 자료 검증, 상환능력 분석"],
-          ["주요계정", "단일회사 주요계정", "매출액, 자산총계, 부채총계, 자본총계", "출처 간 대조"],
-          ["공시 목록", "공시검색", "접수일, 공시 유형, 보고서명, 접수번호", "사후 모니터링, 기업 정보"],
-          ["전환사채", "전환사채권 발행결정", "회차, 발행금액, 표면이자율, 만기이자율, 만기일, 전환가액", "사채 만기 검증, 사후 모니터링"],
-          ["감사의견", "회계감사인의 명칭 및 감사의견", "감사의견, 감사인", "자료 검증"],
-          ["임원", "임원 현황", "성명, 직위, 등기 여부", "대표권 확인"],
-          ["관계", "최대주주 현황, 타법인 출자현황", "주주명·지분율, 출자 법인·출자 목적·지분율·장부가액", "기업 정보"],
-        ])}
-        <p class="note">대상: ${Object.values(DATA.companies).map((x) => esc(x.name)).join(", ")} (코스닥 상장), 2015~2025 사업연도. 금액 단위 원.</p>
-        <h3>재무제표 계정 대응</h3>
-        ${tbl(["항목", "재무제표", "공시 계정명 · 표준계정코드"], Object.keys(C.LABELS).filter((k) => acc[k]).map((k) => [C.LABELS[k], sjOf(k), `<span class="small">${[...acc[k]].map(esc).join("<br>")}</span>`]))}
-        <p class="note">회사별로 계정명이 다르므로 표준계정코드를 우선 사용하고 표준계정코드가 없는 계정은 계정명으로 대응시켰습니다.</p>
-        <h3>정보 시점</h3>
-        ${tbl(["항목", "기준", "근거"], [
-          ["분석 기준일", SEED.asOf, "시연 기준일"],
-          ["사용 자료", "기준일 이전 공시일의 자료만 사용", "기준일 이후 정보가 분석에 섞이는 미래 정보 편향(look-ahead bias) 방지"],
-          ["기준 재무제표", "별도재무제표", "대출 신청 법인 자체의 상환능력 평가. 연결재무제표는 종속기업 실적 포함"],
-        ])}
-        <h3>가상 데이터</h3>
-        ${tbl(["항목", "내용", "사유"], [
-          ["은행·사용자", `${esc(SEED.bank)}, 심사역·심사팀장·고객 각 1명`, "은행 내부 정보 비공개"],
-          ["대출 신청", `${man(app.amount)}, 연 ${app.rate}%, ${app.years}년, 만기일시상환`, "신청 조건은 고객 입력 정보"],
-          ["실행 여신", `${SEED.loans[0].id}: ${man(SEED.loans[0].amount)}, 연 ${SEED.loans[0].rate}%, 이자 납입 내역`, "은행 내부 거래 정보"],
-          ["내규", "상품별 심사 업무·필요 자료·전결 한도", "은행별 내규 비공개"],
-        ])}
-      </section>
-
       <section class="card"><h2>재무지표</h2>
-        ${tbl(["지표", "산식", "처리 기준"], [
-          ["부채비율", "부채총계 ÷ 자본총계", "자본총계 0 이하(자본잠식) 시 산출 제외"],
-          ["유동비율", "유동자산 ÷ 유동부채", "유동부채 0 이하 시 산출 제외"],
-          ["차입금의존도", "총차입금 ÷ 자산총계", ""],
-          ["순차입금", "총차입금 − 현금및현금성자산", ""],
-          ["영업이익률", "영업이익 ÷ 매출액", ""],
-          ["이자보상배율", "영업이익 ÷ 금융원가", "금융원가에 전환사채 평가손실 등 이자 외 항목 포함 가능, 실제 이자 기준보다 낮게 산출될 수 있음"],
-          ["영업현금흐름 대비 차입금", "영업활동현금흐름 ÷ 총차입금", ""],
-        ])}
-        ${tbl(["항목", "기준", "근거"], [
-          ["총차입금", meta.DEBT_PARTS.map((d) => d[1]).join(", "), "이자부 부채 합계. 리스부채는 K-IFRS 제1116호에 따라 인식된 금융부채로 포함"],
-          ["1년 내 만기 차입금", "단기차입금, 유동성장기차입금, 유동성전환사채, 유동리스부채", "K-IFRS 제1001호 유동부채 분류 기준(보고기간 후 12개월)"],
-          ["전환사채 금액", "재무상태표 장부금액", "상환 시 지급액(원금 + 상환할증금)과 차이 가능"],
-        ])}
-        <p class="note">${kind.계산} 산식은 일반적인 재무분석 정의를 따릅니다.</p>
-      </section>
+        ${tbl(["지표", "산식"], [
+          ["부채비율", "부채총계 ÷ 자본총계"],
+          ["유동비율", "유동자산 ÷ 유동부채"],
+          ["차입금의존도", "총차입금 ÷ 자산총계"],
+          ["순차입금", "총차입금 − 현금및현금성자산"],
+          ["이자보상배율", "영업이익 ÷ 금융원가"],
+          ["총차입금", meta.DEBT_PARTS.map((d) => d[1]).join(" + ")],
+        ])}</section>
 
-      <section class="card"><h2>자료 검증 기준</h2>
-        ${tbl(["항목", "확인 필요 기준", "근거", "구분"], [
-          ["정보 시점", "최근 결산일 후 6개월 경과", "결산 후 6개월이 지나면 반기 실적이 발생. 반기보고서 제출 기한은 반기 종료 후 45일(자본시장법 제160조)", `${kind.기준} ${kind.가정}`],
-          ["연결·별도 범위", "연결재무제표 공시 중단. 연결 매출이 별도 매출의 1.3배 초과 시 정보 표시", "종속기업 처분 등 연결 범위 변동 확인. 1.3배는 종속기업 비중 판단을 위한 가정", kind.가정],
-          ["재무상태표 등식", "자산과 부채·자본 합계 차이 100만 원 초과", "공시 금액의 표시 단위·반올림 차이 허용", kind.가정],
-          ["출처 간 대조", "주요계정과 전체 재무제표 값 차이 100만 원 초과 (최근 3개 연도)", "동일 공시에서 산출된 값의 일치 여부 확인", kind.가정],
-          ["전년도 수치 재작성", "비교표시 금액과 최초 공시 금액 차이가 0.5%와 1천만 원을 모두 초과", "회계정책 변경·오류 수정 확인. 비율·금액 기준은 중요성 판단을 위한 가정", kind.가정],
-          ["사채 만기", "기준일 이전 6개월 이내 또는 이후 12개월 이내 만기", "향후 12개월은 유동부채 분류 기준(K-IFRS 제1001호). 과거 6개월은 최근 상환·전환 여부 확인", `${kind.기준} ${kind.가정}`],
-          ["감사의견", "적정 외 의견(한정·부적정·의견거절)", "외부감사 감사의견 유형", kind.기준],
-          ["대표권", "신청인 이름과 공시 임원현황상 대표이사 비교", "상법상 대표이사의 회사 대표권(제389조). 이름 비교는 참고용, 법인등기로 최종 확인", kind.기준],
-        ])}
-      </section>
+      <section class="card"><h2>자료 검증</h2>
+        ${tbl(["항목", "확인 필요 기준", "근거"], [
+          ["정보 시점", "결산 후 6개월 경과", `반기 실적 발생 (반기보고서 제출 기한 45일, 자본시장법 제160조) ${B}`],
+          ["사채 만기", "향후 12개월 이내 만기", `유동부채 분류 기준 (K-IFRS 제1001호) ${B}`],
+          ["감사의견", "적정 외 의견", `한정·부적정·의견거절 ${B}`],
+          ["대표권", "신청인과 공시상 대표이사 불일치", `대표이사의 대표권 (상법 제389조) ${B}`],
+          ["연결 범위", "연결재무제표 공시 중단", "종속기업 변동 확인"],
+          ["수치 재작성", "최초 공시와 0.5%·1천만 원 초과 차이", `중요성 기준 ${A}`],
+          ["출처 대조·등식", "100만 원 초과 차이", `표시 단위 차이 허용 ${A}`],
+        ])}</section>
 
-      <section class="card"><h2>위험 신호와 사전 부도확률</h2>
-        ${tbl(["규칙", "점수", "근거"], meta.RISK_RULES.map((r) => [esc(r.text), r.pts, ruleBasis[r.id] || ""]))}
-        ${tbl(["구간", "점수", "사전 부도확률"], bandRows)}
-        <p class="note">${kind.가정} 규칙 점수와 구간별 부도확률은 설명용 가정이며 신용평가모형이 아닙니다. 실제 운영 시 신용평가모형의 등급별 부도확률(PD)로 대체합니다.
-          이자보상배율 규칙은 유동성 위험과 함께 상환 불능에 가장 직접적인 신호로 보아 2점을 부여했습니다.</p>
-      </section>
+      <section class="card"><h2>위험 신호</h2>
+        ${tbl(["규칙", "점수"], meta.RISK_RULES.map((r) => [esc(r.text), r.pts]))}
+        <p class="note">구간별 부도확률 ${A}: ${bands}</p>
+        <p class="note">이자보상배율 1 미만: 한국은행 한계기업 기준(3년 연속 1 미만) 참조</p></section>
 
-      <section class="card"><h2>상환능력 분석</h2>
-        ${tbl(["항목", "기준", "근거", "구분"], [
-          ["DSCR", "상환재원 ÷ (신규 대출 이자·원금 + 기존 차입금 이자 + 1년 내 만기분 중 차환 제외 금액)", "원리금상환비율(Debt Service Coverage Ratio). 1 미만은 상환재원으로 원리금 상환 불가", kind.계산],
-          ["상환재원", "기준 연도 영업활동현금흐름 + 시나리오 영업이익 변동분", "이자지급을 영업활동으로 분류한 기업은 이자가 이미 차감되어 보수적 산출", kind.계산],
-          ["기존 차입금 금리", `연 ${sd.existingRate}%`, "개별 차입 약정금리 미공시. 중소기업 대출 금리 수준 가정", kind.가정],
-          ["1년 내 만기분 차환율", `${sd.refinanceRatio}%`, "단기차입금의 만기 연장 관행 반영", kind.가정],
-          ["스트레스 시나리오", `매출 ${sd.salesShock}%, 영업이익률 ${sd.marginShock}%p, 금리 +${sd.rateShock}%p`, "매출 감소·수익성 악화·금리 상승의 개별·복합 충격", kind.가정],
-          ["신규 대출 조건", `${man(app.amount)}, 연 ${app.rate}%, ${app.years}년, 만기일시상환`, "가상 신청 조건", kind.가상],
-        ])}
-      </section>
+      <section class="card"><h2>상환능력</h2>
+        ${tbl(["항목", "기준"], [
+          ["DSCR", "상환재원 ÷ 원리금 (기존 차입금 포함)"],
+          ["상환재원", "영업활동현금흐름 + 시나리오 영업이익 변동분"],
+          ["기존 차입 금리", `연 ${sd.existingRate}% ${A}`],
+          ["1년 내 만기분 차환율", `${sd.refinanceRatio}% ${A}`],
+          ["스트레스", `매출 ${sd.salesShock}%, 영업이익률 ${sd.marginShock}%p, 금리 +${sd.rateShock}%p ${A}`],
+        ])}</section>
 
-      <section class="card"><h2>정보가치 기반 추가 확인 항목 선택</h2>
-        <h3>손실 구조</h3>
-        ${tbl(["결정", "실제 상태", "손실", "산정"], [
-          ["승인", "부도", "부도 시 손실", "대출금 × 부도시손실률(LGD)"],
-          ["거절", "정상", "기회손실", `기대 이자이익 = 대출금 × (대출 금리 − 자금조달금리 ${ea.fundingRate}%) × 대출 기간`],
-          ["승인", "정상", "없음", ""],
-          ["거절", "부도", "없음", ""],
+      <section class="card"><h2>정보가치</h2>
+        ${tbl(["경우", "손실"], [
+          ["부도 기업 승인", "대출금 × LGD"],
+          ["정상 기업 거절", `기대 이자이익 = 대출금 × (대출 금리 − 자금조달금리 ${ea.fundingRate}% ${A}) × 기간`],
+          ["추가 확인", `확인 비용 = 고객 이탈률 × 기대 이자이익 + 처리비용`],
         ])}
-        <h3>상품별 부도시손실률 (LGD)</h3>
-        ${tbl(["상품", "LGD", "근거"], ont.products.map((p) => [esc(p.name), lgdTxt(p.lgd), esc(p.lgdBasis)]).concat([[esc(SEED.renewalPolicy.product), lgdTxt(SEED.renewalPolicy.lgd), esc(SEED.renewalPolicy.lgdBasis)]]))}
-        <p class="note">${kind.기준} 감독 LGD는 바젤Ⅱ 기초 내부등급법 기준입니다. 보증 비율 85%는 ${kind.가정} 값입니다.</p>
-        <h3>확인 비용</h3>
-        <p class="small">확인 비용 = 고객 이탈률 × 기대 이자이익 + 내부 처리비용. 추가 자료 요청에 따른 신청 철회 위험과 심사 인력·출장 비용을 반영합니다.
-          신규 예시 ${esc(app.id)} (${man(app.amount)}, 연 ${app.rate}%, ${app.years}년): 기대 이자이익 ${man(ex.margin)}.
-          만기연장 예시 ${esc(ln.id)} (${man(ln.balance)}, 연 ${ln.renewal.requestedRate}%, ${ln.renewal.requestedYears}년): 기대 이자이익 ${man(exR.margin)}.</p>
-        ${tbl(["확인 항목", "민감도", "특이도", "고객 이탈률", "처리비용", "확인 비용 (예시)", "적용"],
-          Object.entries(ea.actions).map(([id, a]) => [esc(a.name), a.sens.toFixed(2), a.spec.toFixed(2), pct(a.dropout, 1), man(a.handling),
-            man(a.dropout * (SEED.renewalPolicy.optional.includes(id) ? exR.margin : ex.margin) + a.handling), esc(productsOf(id))]))}
-        <p class="note">${kind.가정} 민감도는 부도 기업에서 '우려' 결과가 나올 확률, 특이도는 정상 기업에서 '양호' 결과가 나올 확률입니다. 실제 운영 시 과거 심사 건의 확인 결과와 사후 부도 여부로 추정합니다.
-          부동산담보대출은 필수 업무인 담보 현장 확인과 중복되는 사업장 현장 실사를 선택 확인 항목에서 제외했습니다.</p>
-        <h3>계산 방법</h3>
+        <h3>상품별 LGD</h3>
+        ${tbl(["상품", "LGD", "근거"], ont.products.map((p) => [esc(p.name.replace(" (가상)", "")), lgdTxt(p.lgd),
+          p.id === "guarantee" ? `보증 비율 85% ${A}, 비보증분 무담보 45%` : `바젤Ⅱ 기초 내부등급법 감독 LGD ${B}`]))}
+        <h3>선택 확인 항목 ${A}</h3>
+        ${tbl(["항목", "민감도", "특이도", "고객 이탈률", "처리비용"],
+          Object.values(ea.actions).filter((a, i, arr) => arr.findIndex((b) => b.name === a.name) === i)
+            .map((a) => [esc(a.name), a.sens.toFixed(2), a.spec.toFixed(2), pct(a.dropout, 1), man(a.handling)]))}
+        <h3>계산</h3>
         ${tbl(["단계", "방법"], [
-          ["사전 부도확률", "위험 신호 구간의 부도확률(가정)"],
-          ["확률 갱신", "베이즈 정리. 우려 결과 시 사후확률 = p·s ÷ (p·s + (1−p)(1−c))"],
-          ["결정", "기대손실이 작은 쪽 선택. 승인 기대손실 = p × 부도 시 손실, 거절 기대손실 = (1−p) × 기회손실"],
-          ["정보가치", "표본정보의 기대가치(EVSI) = 현재 기대손실 − 확인 결과 반영 후 기대손실"],
-          ["순정보가치", "정보가치 − 확인 비용. 양수인 항목만 요청"],
-          ["선택 요청 방식", "순정보가치가 가장 큰 항목부터 요청하고 결과에 따라 남은 항목 재평가하는 순차 선택(최대 6단계)"],
-          ["비교 기준", "추가 확인 없이 결정, 선택 확인 항목 전체 요청(결과 조합 2ⁿ 전체 계산)"],
-        ])}
-      </section>
+          ["확률 갱신", "베이즈 정리 (민감도·특이도)"],
+          ["정보가치", "현재 기대손실 − 확인 결과 반영 후 기대손실"],
+          ["순정보가치", "정보가치 − 확인 비용, 양수 항목만 요청"],
+          ["요청 순서", "순정보가치가 큰 항목부터, 결과에 따라 재평가"],
+        ])}</section>
 
-      <section class="card"><h2>심사 온톨로지 기준</h2>
-        ${tbl(["항목", "기준", "근거", "구분"], [
-          ["상품별 심사 업무", ont.products.map((p) => `${esc(p.name.replace(" (가상)", ""))}: ${p.tasks.map((t) => esc(ont.tasks[t].name)).join(", ")}`).join("<br>"), "공통 업무(차입 권한·재무 상태·상환능력·체납 확인)에 상품별 업무 추가", kind.가상],
-          ["위임장", "대리 신청 시 차입 권한 확인에 추가", "대표이사 외 신청인의 대리권 확인", kind.기준],
-          ["재무제표 확보 경로", "상장기업 DART 자동 수집, 비상장·공시 부족 기업 고객 제출", "사업보고서 공시 의무 여부", kind.기준],
-          ["현장 확인", "부동산담보대출 필수", "담보 물건 현황과 감정평가 내용의 일치 여부 확인", kind.가상],
-          ["전결 한도", ont.approvalLimits.map((l) => `${man(l.max)} 이하 ${esc(l.role)}`).join(", "), "가상은행 전결 규정", kind.가상],
-        ])}
-      </section>
-
-      <section class="card"><h2>사후 모니터링 중요도</h2>
-        ${tbl(["중요도", "공시 분류", "근거"], sevGroups)}
-        <p class="note">${kind.가정} 공시 분류는 공시 보고서명 기준입니다. 사채 만기는 '검토'로 분류합니다.</p>
-      </section>
-
-      <section class="card"><h2>한계</h2>
-        ${tbl(["항목", "내용"], [
-          ["가정값", "LGD 외 사전 부도확률·민감도·특이도·고객 이탈률·처리비용·자금조달금리는 은행 내부 데이터로 추정해야 하는 값"],
-          ["기회손실", "운영비용·자본비용 미반영, 대출 금리와 자금조달금리 차이만 반영"],
-          ["대표권 확인", "공시 임원현황 기준 이름 비교, 법적 권한 판단 아님"],
-          ["상품별 내규", "가상은행 기준, 실제 은행 내규·법적 요건 아님"],
-          ["데이터 범위", "코스닥 상장 2개사, 은행 내부 거래 정보 미포함"],
-        ])}
-      </section>`;
+      <section class="card"><h2>내규·모니터링</h2>
+        ${tbl(["항목", "기준"], [
+          ["전결 한도", `${ont.approvalLimits.map((l) => `${man(l.max)} 이하 ${esc(l.role)}`).join(", ")} ${tag("SYN")}`],
+          ["현장 확인", `부동산담보대출 ${tag("SYN")}`],
+          ["모니터링 긴급", sev("긴급")],
+          ["모니터링 검토", sev("검토") + ", 사채 만기"],
+        ])}</section>`;
   }
 
   // ------------------------------------------------------------ 업무 기능 관리 (패키지)
