@@ -407,7 +407,7 @@
       ? `<a href="#/${r.page === "case" ? "home" : r.page === "loan" ? "loans" : "company"}">${PAGE_LABEL[r.page]}</a><span>›</span><b>${esc(r.id || "")}</b>`
       : "";
     main.innerHTML = (crumb ? `<div class="crumb keep">${crumb}</div>` : "") + (pages[r.page] || pageHome)(r);
-    main.querySelectorAll("table.t:not(.num)").forEach((tb) => {
+    main.querySelectorAll("table.t:not(.num), table.t.mstack").forEach((tb) => {
       const hr = tb.querySelector("tr"); if (!hr) return;
       const ths = Array.from(hr.children).map((h) => h.textContent.trim());
       if (ths.length < 4) return;
@@ -501,10 +501,10 @@
       <div class="seg"><button class="${fsScope === "OFS" ? "on" : ""}" data-scope="OFS">별도</button><button class="${fsScope === "CFS" ? "on" : ""}" data-scope="CFS">연결</button></div>
       ${!ys.length ? `<p class="empty">연결재무제표가 없습니다.</p>` : `
       <div class="grid2"><section class="card"><h3>매출액</h3>${chart}</section><section class="card"><h3>영업이익</h3>${chart2}</section></div>
-      <section class="card scroll"><table class="t num"><tr><th>항목</th>${ys.map((y) => `<th>${y}</th>`).join("")}</tr>
-        ${keys.map((k) => `<tr><td>${C.LABELS[k]}</td>${ys.map((y) => { const it = C.item(c, fsScope, y, k);
+      <section class="card scroll"><table class="t num fin5"><tr><th>항목</th>${ys.slice(-5).map((y) => `<th>${y}</th>`).join("")}</tr>
+        ${keys.map((k) => `<tr><td>${C.LABELS[k]}</td>${ys.slice(-5).map((y) => { const it = C.item(c, fsScope, y, k);
           return `<td title="${it ? esc(it.src.account_nm + " · 접수번호 " + it.src.rcept_no) : "자료 없음"}">${it ? fmt(it.v) : "-"}</td>`; }).join("")}</tr>`).join("")}
-        <tr class="srcrow"><td>원문</td>${ys.map((y) => `<td>${dartLink(c.financials[fsScope][y].rcept_no, "보기")}</td>`).join("")}</tr></table></section>`}`;
+        <tr class="srcrow"><td>원문</td>${ys.slice(-5).map((y) => `<td>${dartLink(c.financials[fsScope][y].rcept_no, "보기")}</td>`).join("")}</tr></table></section>`}`;
   }
 
   function coDebt(c) {
@@ -627,12 +627,12 @@
     // 5. 추가 확인 항목 선택
     const requested = (name) => c.requests.some((x) => x.name === name);
     const s5 = step(5, "추가 확인 항목 선택", `
-      <table class="t num"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th></th></tr>
+      <table class="t num mstack"><tr><th class="l">확인 항목</th><th>정보가치</th><th>확인 비용</th><th>순정보가치</th><th></th></tr>
         ${nba.ranked.map((a) => `<tr><td class="l">${esc(a.name)}</td><td>${fmt(a.evi, 2)}</td><td>${fmt(a.cost, 2)}</td>
           <td class="${a.net > 0 ? "ok-t" : "muted"}">${fmt(a.net, 2)}</td>
           <td>${requested(a.name) ? '<span class="muted">요청함</span>' : a.recommend ? `<button data-act="RequestDocument" data-name="${esc(a.name)}" data-detail="${esc(a.detail)}" data-reason="순정보가치 양수">요청</button>` : '<span class="muted">보류</span>'}</td></tr>`).join("")}</table>
       <h3>요청 방식 비교</h3>
-      <table class="t num"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
+      <table class="t num mstack"><tr><th class="l">방식</th><th>평균 요청 건수</th><th>확인 비용</th><th>기대손실</th><th>합계</th></tr>
         ${nba.compare.map((x, i) => `<tr class="${i === 2 ? "hlrow" : ""}"><td class="l">${esc(x.name)}</td><td>${x.count.toFixed(2)}</td><td>${fmt(x.cost, 2)}</td><td>${fmt(x.loss, 2)}</td><td><b>${fmt(x.cost + x.loss, 2)}</b></td></tr>`).join("")}</table>
       <p class="note"><a href="#/model">모델 설명</a></p>`);
 

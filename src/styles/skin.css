@@ -256,3 +256,33 @@ nav::-webkit-scrollbar { height: 0; }
 .demo-running .toast { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
 .demo-btn { white-space: nowrap; flex: none; }
 @media (max-width: 600px) { .demo-btn { padding: 3px 8px; font-size: 11.5px; } .top .user select { max-width: 104px; } .top .meta { gap: 6px; } }
+
+/* 휴대폰 화면 */
+@media (max-width: 900px) {
+  nav { flex-wrap: wrap; overflow-x: visible; gap: 6px; padding: 8px 12px; }
+  nav a { padding: 5px 11px; border: 1px solid var(--line); border-radius: 16px; background: #fff; font-size: 12.5px; gap: 6px; white-space: nowrap; }
+  nav a .ic { display: none; }
+  nav a span { flex: none; }
+  nav a.on { box-shadow: none; background: var(--yellow-weak); border-color: var(--yellow-deep); }
+  .case-side { order: -1; }
+  .stepper { overflow: visible; padding: 10px 6px; }
+  .stepper li { min-width: 0; flex-direction: column; text-align: center; gap: 4px; padding-right: 0; }
+  .stepper li + li::before { display: none; }
+  .stepper small { display: none; }
+  .stepper b { font-size: 11px; }
+}
+@media (max-width: 600px) {
+  .t td, .t th { white-space: normal; }
+  .t.num td, .t.num th, .t td.nw { white-space: nowrap; }
+  .t td .note, .t td div, .t td p, .t td.small { min-width: 0; }
+  .page-head h1 { font-size: 17px; }
+  .h1-co { display: block; margin: 2px 0 0; font-size: 14px; }
+  .demo-panel p { font-size: 13px; }
+  .grid3 { grid-template-columns: 1fr; }
+  .t.num td, .t.num th { padding: 6px 5px; font-size: 11.5px; }
+  .t.num.stack td { padding: 2px 0; font-size: 12.5px; white-space: normal; }
+  .t.num td:first-child, .t.num th:first-child { white-space: normal; word-break: keep-all; min-width: 64px; }
+}
+.guide { margin-bottom: 12px; }
+@media (max-width: 400px) { .fin5 tr > :nth-child(2) { display: none; } }
+body { word-break: keep-all; overflow-wrap: break-word; }
